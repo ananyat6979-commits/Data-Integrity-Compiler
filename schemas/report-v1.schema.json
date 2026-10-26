@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dic-report-v1",
+  "type": "object",
+  "required": ["schema_version", "run_id", "source_artifacts", "contract_id", "outcome", "checks", "evidence", "expected_observed", "publication", "runtimes_seconds", "versions", "row_counts", "logical_output_hashes"],
+  "properties": {
+    "schema_version": {"const": "dic-report-v1"}, "run_id": {"type": "string"}, "fault_id": {"type": ["string", "null"]},
+    "source_artifacts": {"type": "object"}, "contract_id": {"type": "string"}, "outcome": {"enum": ["passed", "blocked"]},
+    "checks": {"type": "array", "items": {"type": "object", "required": ["id", "severity", "passed"], "properties": {"id": {"type": "string"}, "severity": {"enum": ["block", "warn", "info"]}, "passed": {"type": "boolean"}}, "additionalProperties": true}},
+    "evidence": {"type": "object"}, "expected_observed": {"type": "object"}, "downstream_aggregate_deltas": {"type": "array"},
+    "publication": {"type": "object"}, "runtimes_seconds": {"type": "object"}, "versions": {"type": "object"}, "row_counts": {"type": "object"}, "logical_output_hashes": {"type": "object"}
+  },
+  "additionalProperties": true
+}

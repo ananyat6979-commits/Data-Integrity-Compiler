@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dic-report-v2",
+  "type": "object",
+  "required": ["schema_version", "run_id", "source_artifacts", "contract_id", "contract_version", "contract_hash", "cleaning", "outcome", "checks", "evidence", "expected_observed", "publication", "runtimes_seconds", "peak_memory", "versions", "row_counts", "logical_output_hashes"],
+  "properties": {
+    "schema_version": {"const": "dic-report-v2"}, "run_id": {"type": "string"}, "fault_id": {"type": ["string", "null"]},
+    "source_artifacts": {"type": "object"}, "contract_id": {"type": "string"}, "contract_version": {"type": ["integer", "string"]}, "contract_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "cleaning": {"type": "object", "required": ["rejection_attribution", "total_rejected_rows", "rejected_rows_by_rule"], "properties": {"rejection_attribution": {"const": "first_failing_rule"}, "total_rejected_rows": {"type": "integer", "minimum": 0}, "rejected_rows_by_rule": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}}},
+    "peak_memory": {"type": "object", "required": ["status", "metric", "platform", "method", "native_units", "scope", "value_bytes"], "properties": {"status": {"enum": ["available", "unavailable"]}, "metric": {"const": "peak_working_set"}, "platform": {"type": "string"}, "method": {"type": "string"}, "native_units": {"type": ["string", "null"]}, "scope": {"const": "dedicated_experiment_process"}, "value_bytes": {"type": ["integer", "null"], "minimum": 0}, "conversion": {"type": ["string", "null"]}, "reason": {"type": "string"}}},
+    "outcome": {"enum": ["passed", "blocked"]},
+    "checks": {"type": "array", "items": {"type": "object", "required": ["id", "severity", "passed"], "properties": {"id": {"type": "string"}, "severity": {"enum": ["block", "warn", "info"]}, "passed": {"type": "boolean"}}, "additionalProperties": true}},
+    "evidence": {"type": "object"}, "expected_observed": {"type": "object"}, "downstream_aggregate_deltas": {"type": "array"},
+    "publication": {"type": "object"}, "runtimes_seconds": {"type": "object"}, "versions": {"type": "object"}, "row_counts": {"type": "object"}, "logical_output_hashes": {"type": "object"}
+  },
+  "additionalProperties": true
+}
