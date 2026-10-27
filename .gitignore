@@ -13,12 +13,15 @@ dist/
 data/raw/
 data/runs/
 data/published/
+data/failures/
 data/clean-controls/
 data/clean_report.json
 data/fault_report.json
 data/jan-2024-reconciliation.json
 # Kaggle packaging and downloaded results
 experiments/kaggle_upload/*.zip
+experiments/kaggle_upload/*.provenance.json
 experiments/kaggle_upload/dic-m1-validation-results/
+results/m1/archive/
 # local scaffolding
 .closure-baseline/
