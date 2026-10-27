@@ -1,16 +1,20 @@
 import json
 import hashlib
+import os
 import platform
 import sys
 import shutil
+import subprocess
+import time
 from types import SimpleNamespace
 from pathlib import Path
 
 import jsonschema
 import pytest
 
-from dic.pipeline import (_publish, classify_schema, evaluate, inject_m1, load_contract,
-                          measure_peak_working_set, run, validate_report)
+from dic.pipeline import (_publish, canonical_hash, classify_schema, collect_orphaned_staging,
+                          evaluate, inject_m1, load_contract, measure_peak_working_set, run,
+                          validate_report)
 
 
 SCHEMA = Path(__file__).parents[1] / "schemas" / "report-v2.schema.json"
@@ -66,6 +70,14 @@ def test_duplicate_m1_block_evidence_and_independent_effect(sample):
     assert evaluate(Path(root / "data/runs" / report["run_id"] / "report.json"), fault["ground_truth"])["key_matches"]
     assert json.loads((root / "data/published/CURRENT").read_text())["run_id"] == good["run_id"]
     assert (root / "data/runs" / report["run_id"] / "report.json").is_file()
+
+
+def test_worker_fails_on_any_ground_truth_path_open(sample):
+    trips, lookup, root = sample
+    forbidden_input = root / "ground_truth-input.parquet"
+    shutil.copyfile(trips, forbidden_input)
+    with pytest.raises(RuntimeError, match="Detector attempted to open forbidden ground truth path"):
+        run(forbidden_input, lookup, root)
 
 
 def test_blocked_first_run_publishes_nothing(sample):
@@ -153,6 +165,21 @@ def test_stage_outputs_are_parquet_and_runtimes_are_separate(sample):
     assert report["contract_hash"] == report["source_artifacts"]["contract_sha256"]
 
 
+def test_small_fixture_canonical_fingerprint_is_portable(sample):
+    import duckdb
+    trips, lookup, root = sample
+    report = run(trips, lookup, root)
+    output = root / "data/runs" / report["run_id"] / "clean_trips.parquet"
+    con = duckdb.connect()
+    rows = con.execute(
+        "SELECT source_row_ordinal, pickup_zone, pickup_date, fare_decimal "
+        "FROM read_parquet(?) ORDER BY source_row_ordinal", [str(output)]).fetchall()
+    con.close()
+    expected = json.loads((Path(__file__).parent / "fixtures" / "small-fingerprint.json").read_text())
+    assert expected["row_count"] == len(rows)
+    assert expected["canonical_sha256"] == canonical_hash(rows)
+
+
 def test_contract_hash_covers_yaml_and_referenced_schema(sample):
     _, _, root = sample
     before = load_contract(root)[2]
@@ -166,6 +193,21 @@ def test_contract_hash_covers_yaml_and_referenced_schema(sample):
     schema["description"] = "hash coverage regression"
     schema_file.write_text(json.dumps(schema))
     assert load_contract(root)[2] != before
+
+
+def test_contract_hash_is_stable_across_line_endings(sample):
+    _, _, root = sample
+    paths = [root / "contracts/pipeline.yaml", root / "contracts/tlc-yellow-v1.json"]
+    originals = [path.read_bytes() for path in paths]
+    expected = load_contract(root)[2]
+    try:
+        for path, content in zip(paths, originals):
+            normalized = content.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+            path.write_bytes(normalized.replace(b"\n", b"\r\n"))
+        assert load_contract(root)[2] == expected
+    finally:
+        for path, content in zip(paths, originals):
+            path.write_bytes(content)
 
 
 def test_contract_rejects_unsupported_operator_and_missing_setting(sample):
@@ -198,16 +240,28 @@ def test_cleaning_contract_changes_behavior_and_reports_first_failure(sample):
     assert cleaning["rejected_rows_by_rule"]["nonnegative_fare"] == 2
 
 
-def test_join_policies_change_enforcement_and_key_changes_behavior(sample):
+def test_unsupported_join_key_is_rejected(sample):
     trips, lookup, root = sample
-    default = run(trips, lookup, root)
     contract_file = root / "contracts/pipeline.yaml"
     original = contract_file.read_text()
     contract_file.write_text(original.replace("key: PULocationID", "key: DOLocationID", 1))
-    dropoff = run(trips, lookup, root)
-    assert dropoff["row_counts"]["matched_rows"] != default["row_counts"]["matched_rows"]
+    with pytest.raises(RuntimeError, match="join.key must be PULocationID"):
+        run(trips, lookup, root)
+    contract_file.write_text(original)
+
+
+def test_unmatched_key_policy_changes_handling(sample):
+    trips, lookup, root = sample
+    contract_file = root / "contracts/pipeline.yaml"
+    original = contract_file.read_text()
     contract_file.write_text(original.replace("unmatched_policy: exclude", "unmatched_policy: block"))
     assert run(trips, lookup, root)["outcome"] == "blocked"
+
+
+def test_lookup_uniqueness_and_cardinality_policies_change_enforcement(sample):
+    trips, lookup, root = sample
+    contract_file = root / "contracts/pipeline.yaml"
+    original = contract_file.read_text()
     fault = inject_m1(lookup, root / "data/runs", "1")
     contract_file.write_text(original.replace("lookup_uniqueness_severity: block", "lookup_uniqueness_severity: warn"))
     still_blocked = run(trips, fault["lookup"], root, fault["fault_id"], lookup)
@@ -256,6 +310,19 @@ def test_windows_peak_memory_counter(monkeypatch):
     assert result["value_bytes"] == 4096
 
 
+def test_unmocked_peak_memory_smoke_records_metadata():
+    script = "import json; from dic.pipeline import measure_peak_working_set; print(json.dumps(measure_peak_working_set()))"
+    completed = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, check=True)
+    result = json.loads(completed.stdout)
+    assert result["metric"] == "peak_working_set"
+    assert result["platform"] and result["method"] and result["scope"] == "dedicated_experiment_process"
+    if result["status"] == "available":
+        assert isinstance(result["value_bytes"], int) and 0 < result["value_bytes"] < 128 * 1024**3
+        assert result["native_units"] and result["conversion"] is not None
+    else:
+        assert result["reason"] and result["value_bytes"] is None
+
+
 def test_contract_validation_failure_preserves_current(sample):
     trips, lookup, root = sample
     current = run(trips, lookup, root)
@@ -283,3 +350,74 @@ def test_input_validation_failure_cleans_staging_and_preserves_current(sample):
     assert after == before
     assert (root / "data/published/CURRENT").read_bytes() == pointer
     assert json.loads((root / "data/published/CURRENT").read_text())["run_id"] == current["run_id"]
+
+
+def test_report_validation_failure_precedes_pointer_swap_and_records_error(sample):
+    trips, lookup, root = sample
+    current_report = run(trips, lookup, root)
+    current = root / "data/published/CURRENT"
+    pointer_before = current.read_bytes()
+    published_before = {p.name for p in (root / "data/published").iterdir() if p.is_dir()}
+    runs_before = {p.name for p in (root / "data/runs").iterdir() if p.is_dir()}
+    with pytest.raises(RuntimeError, match="invalid-report-version"):
+        run(trips, lookup, root, _test_failpoint="invalid_publication_report")
+    assert current.read_bytes() == pointer_before
+    assert json.loads(current.read_text())["run_id"] == current_report["run_id"]
+    assert {p.name for p in (root / "data/published").iterdir() if p.is_dir()} == published_before
+    assert {p.name for p in (root / "data/runs").iterdir() if p.is_dir()} == runs_before
+    failures = list((root / "data/failures").glob("*.json"))
+    record = json.loads(max(failures, key=lambda p: p.stat().st_mtime).read_text())
+    assert record["status"] == "failed"
+    assert record["error_type"] == "ValidationError"
+    assert record["run_id"] and "schema_version" in record["error"]
+
+
+def test_mid_materialization_error_cleans_stage_and_next_run_succeeds(sample):
+    trips, lookup, root = sample
+    runs = root / "data/runs"
+    before = {p.name for p in runs.iterdir() if p.is_dir()} if runs.exists() else set()
+    with pytest.raises(RuntimeError, match="after first output materialization"):
+        run(trips, lookup, root, _test_failpoint="after_first_materialization")
+    after = {p.name for p in runs.iterdir() if p.is_dir()} if runs.exists() else set()
+    assert after == before
+    record = json.loads(max((root / "data/failures").glob("*.json"), key=lambda p: p.stat().st_mtime).read_text())
+    assert record["status"] == "failed"
+    assert record["error_type"] == "RuntimeError"
+    assert record["staging_artifacts"] == ["clean_trips.parquet"]
+    assert run(trips, lookup, root)["outcome"] == "passed"
+
+
+def test_gc_dry_run_and_delete_preserve_current_and_complete_evidence(sample):
+    trips, lookup, root = sample
+    (root / ".git").mkdir()
+    (root / "pyproject.toml").write_text("[project]\nname='fixture'\n")
+    clean = run(trips, lookup, root)
+    fault_input = inject_m1(lookup, root / "data/runs", "1")
+    blocked = run(trips, fault_input["lookup"], root, fault_input["fault_id"], lookup)
+    orphan_id = "a" * 32
+    orphan = root / "data/runs" / orphan_id
+    orphan.mkdir()
+    partial_id = "b" * 32
+    partial_publication = root / "data/published" / partial_id
+    partial_publication.mkdir()
+    pointer_temp = root / "data/published" / ("CURRENT." + "c" * 32 + ".tmp")
+    pointer_temp.write_text("incomplete")
+    injector = root / "data/runs" / "m1-injector-evidence"
+    injector.mkdir()
+    (injector / "ground_truth.private.json").write_text("private")
+    old = time.time() - 3 * 3600
+    for path in (orphan, partial_publication, pointer_temp):
+        os.utime(path, (old, old))
+    current = root / "data/published/CURRENT"
+    pointer = current.read_bytes()
+    preview = collect_orphaned_staging(root, older_than_hours=1)
+    expected_orphans = {f"data/runs/{orphan_id}", f"data/published/{partial_id}",
+                        f"data/published/CURRENT.{'c' * 32}.tmp"}
+    assert set(preview["candidates"]) == expected_orphans and orphan.exists()
+    removed = collect_orphaned_staging(root, older_than_hours=1, delete=True)
+    assert set(removed["removed"]) == expected_orphans
+    assert not orphan.exists() and not partial_publication.exists() and not pointer_temp.exists()
+    assert (injector / "ground_truth.private.json").is_file()
+    assert current.read_bytes() == pointer
+    assert (root / "data/runs" / blocked["run_id"] / "report.json").is_file()
+    assert json.loads(current.read_text())["run_id"] == clean["run_id"]
