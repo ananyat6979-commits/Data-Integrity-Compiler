@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from dic.pipeline import acquire, evaluate, inject_m1, run
+from dic.pipeline import acquire, collect_orphaned_staging, evaluate, inject_m1, run
 
 
 def main() -> None:
@@ -17,6 +17,10 @@ def main() -> None:
     i = sub.add_parser("inject-m1"); i.add_argument("--month", required=True); i.add_argument("--key", required=True)
     e = sub.add_parser("evaluate"); e.add_argument("--report", type=Path, required=True); e.add_argument("--ground-truth", type=Path, required=True)
     x = sub.add_parser("experiment-m1"); x.add_argument("--month", required=True); x.add_argument("--key", required=True)
+    g = sub.add_parser("gc", help="inspect or remove old incomplete staging directories")
+    g.add_argument("--root", type=Path, required=True, help="repository root containing .git and pyproject.toml")
+    g.add_argument("--older-than-hours", type=float, default=24)
+    g.add_argument("--delete", action="store_true", help="remove eligible candidates; default is dry-run")
     args = p.parse_args()
     root = Path.cwd()
     if args.cmd == "acquire":
@@ -44,6 +48,8 @@ def main() -> None:
         result = {"clean_run_id": clean["run_id"], "fault_run_id": fault["run_id"],
                   "evaluation": evaluated, "reconciliation": json.loads((root / "data/jan-2024-reconciliation.json").read_text(encoding="utf-8")),
                   "reports": {"clean": str(clean_report_path), "fault": str(fault_report_path)}}
+    elif args.cmd == "gc":
+        result = collect_orphaned_staging(args.root, args.older_than_hours, args.delete)
     else:
         result = evaluate(args.report, args.ground_truth)
     print(json.dumps(result, indent=2, default=str))
