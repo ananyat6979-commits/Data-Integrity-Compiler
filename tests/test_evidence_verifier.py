@@ -23,7 +23,7 @@ def _write_json(path: Path, value):
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
-def _make_evidence(root: Path) -> Path:
+def _make_evidence(root: Path, manifest_clean_trips: int = 4) -> Path:
     from shutil import copy2
 
     bundle = root / "evidence"
@@ -60,7 +60,8 @@ def _make_evidence(root: Path) -> Path:
                 "publication": {"decision": "blocked" if outcome == "blocked" else "published",
                                 "pointer_before": repeat_id if outcome == "blocked" else None,
                                 "pointer_after": repeat_id if outcome == "blocked" else run_id},
-                "runtimes_seconds": {}, "versions": {}, "row_counts": {},
+                "runtimes_seconds": {}, "versions": {},
+                "row_counts": {"raw_trips": 8, "clean_trips": 4, "enriched_candidate_rows": 4},
                 "logical_output_hashes": {"clean_trips": fingerprint}}
 
     clean = report(clean_id)
@@ -75,7 +76,8 @@ def _make_evidence(root: Path) -> Path:
         run_id = value["run_id"]
         _write_json(bundle / f"data/runs/{run_id}/report.json", value)
         _write_json(bundle / f"data/runs/{run_id}/manifest.json",
-                    {"run_id": run_id, "contract_sha256": contract_hash, "row_counts": {},
+                    {"run_id": run_id, "contract_sha256": contract_hash,
+                     "row_counts": {"raw_trips": 8, "clean_trips": manifest_clean_trips},
                      "logical_output_hashes": value["logical_output_hashes"]})
 
     controls = bundle / "data/clean-controls"
@@ -168,3 +170,12 @@ def test_later_repository_contract_change_does_not_invalidate_history(tmp_path):
     result = verifier.verify_bundle(bundle, later_repo)
     assert result["valid"] is True
     assert result["current_repository_contract_matches"] is False
+
+
+def test_manifest_may_omit_derived_report_counts_but_not_contradict_them(tmp_path):
+    # Real pipeline manifests omit enriched_candidate_rows, which only the report carries.
+    ok = verifier.verify_bundle(_make_evidence(tmp_path / "ok"), ROOT)
+    assert ok["valid"] is True, ok
+    bad = verifier.verify_bundle(_make_evidence(tmp_path / "bad", manifest_clean_trips=5), ROOT)
+    assert bad["valid"] is False
+    assert any("manifest row counts mismatch" in error for error in bad["errors"])

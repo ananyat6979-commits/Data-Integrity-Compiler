@@ -120,7 +120,13 @@ def verify_bundle(path: Path, repo_root: Path | None = None) -> dict:
         require(manifest.get("run_id") == run_id, f"manifest run ID mismatch: {run_id}")
         require(manifest.get("contract_sha256") == report.get("contract_hash"), f"manifest contract hash mismatch: {run_id}")
         require(manifest.get("contract_sha256") == bundled_contract_hash, f"report does not match bundled contract: {run_id}")
-        require(manifest.get("row_counts") == report.get("row_counts"), f"manifest row counts mismatch: {run_id}")
+        manifest_counts = manifest.get("row_counts") or {}
+        report_counts = report.get("row_counts") or {}
+        require(bool(manifest_counts), f"manifest has no row counts: {run_id}")
+        # The report may carry derived counts (e.g. enriched_candidate_rows) that the manifest omits;
+        # every count the manifest does record must agree with the report.
+        require(all(report_counts.get(key) == value for key, value in manifest_counts.items()),
+                f"manifest row counts mismatch: {run_id}")
         require(manifest.get("logical_output_hashes") == report.get("logical_output_hashes"),
                 f"manifest fingerprints mismatch: {run_id}")
         require(report.get("contract_version") == expected["contract_version"], f"report contract version mismatch: {run_id}")
