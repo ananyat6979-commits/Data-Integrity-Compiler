@@ -1,0 +1,8 @@
+{
+  "witness_version": "m1-aggregate-witness-v1",
+  "source_report": "data/runs/5f63dbd47d0d417db0848436d5c1b791/report.json",
+  "affected_daily_zone_groups": 22,
+  "trip_count_delta": 50,
+  "revenue_delta": "4134.35",
+  "all_average_fares_unchanged": true
+}
