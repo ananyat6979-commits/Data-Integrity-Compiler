@@ -1,0 +1,323 @@
+{
+  "manifest_version": "dic-source-manifest-v1",
+  "months": {
+    "2024-01": {
+      "month": "2024-01",
+      "retrieved_at_utc": "2026-10-15T19:28:05.915034+00:00",
+      "sources": [
+        {
+          "path": "yellow_tripdata_2024-01.parquet",
+          "url": "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-01.parquet",
+          "sha256": "c4d59da7bbc8abaeeeb1727947ee93d9891a71acb42854bd80db1571b2030510"
+        },
+        {
+          "path": "taxi_zone_lookup.csv",
+          "url": "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv",
+          "sha256": "1a99e105092230f8620f301edcca7f80d3080642ff404d28ed957d3fa222c8ed"
+        }
+      ],
+      "trip_schema": [
+        {
+          "name": "VendorID",
+          "type": "INTEGER"
+        },
+        {
+          "name": "tpep_pickup_datetime",
+          "type": "TIMESTAMP"
+        },
+        {
+          "name": "tpep_dropoff_datetime",
+          "type": "TIMESTAMP"
+        },
+        {
+          "name": "passenger_count",
+          "type": "BIGINT"
+        },
+        {
+          "name": "trip_distance",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "RatecodeID",
+          "type": "BIGINT"
+        },
+        {
+          "name": "store_and_fwd_flag",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "PULocationID",
+          "type": "INTEGER"
+        },
+        {
+          "name": "DOLocationID",
+          "type": "INTEGER"
+        },
+        {
+          "name": "payment_type",
+          "type": "BIGINT"
+        },
+        {
+          "name": "fare_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "extra",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "mta_tax",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "tip_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "tolls_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "improvement_surcharge",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "total_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "congestion_surcharge",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "Airport_fee",
+          "type": "DOUBLE"
+        }
+      ],
+      "contract_sha256": "947e696d07ed07482a9d542febf5a345693e5a1a29b4db5875dc0fbdeca3c953",
+      "contract_version": 2,
+      "schema_contract": "tlc-yellow-v1",
+      "baseline_month": "2024-01",
+      "schema_classification": "compatible",
+      "missing_required_columns": [],
+      "added_columns": [],
+      "removed_columns": [],
+      "type_changes": [],
+      "unrecognized_added_columns": []
+    },
+    "2024-02": {
+      "month": "2024-02",
+      "retrieved_at_utc": "2026-10-15T19:58:34.171815+00:00",
+      "sources": [
+        {
+          "path": "yellow_tripdata_2024-02.parquet",
+          "url": "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-02.parquet",
+          "sha256": "c76c43c18c6c6664080dd920baab4928988d5786a6b65980792ca7cd796f9f20"
+        },
+        {
+          "path": "taxi_zone_lookup.csv",
+          "url": "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv",
+          "sha256": "1a99e105092230f8620f301edcca7f80d3080642ff404d28ed957d3fa222c8ed"
+        }
+      ],
+      "trip_schema": [
+        {
+          "name": "VendorID",
+          "type": "INTEGER"
+        },
+        {
+          "name": "tpep_pickup_datetime",
+          "type": "TIMESTAMP"
+        },
+        {
+          "name": "tpep_dropoff_datetime",
+          "type": "TIMESTAMP"
+        },
+        {
+          "name": "passenger_count",
+          "type": "BIGINT"
+        },
+        {
+          "name": "trip_distance",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "RatecodeID",
+          "type": "BIGINT"
+        },
+        {
+          "name": "store_and_fwd_flag",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "PULocationID",
+          "type": "INTEGER"
+        },
+        {
+          "name": "DOLocationID",
+          "type": "INTEGER"
+        },
+        {
+          "name": "payment_type",
+          "type": "BIGINT"
+        },
+        {
+          "name": "fare_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "extra",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "mta_tax",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "tip_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "tolls_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "improvement_surcharge",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "total_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "congestion_surcharge",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "Airport_fee",
+          "type": "DOUBLE"
+        }
+      ],
+      "contract_sha256": "947e696d07ed07482a9d542febf5a345693e5a1a29b4db5875dc0fbdeca3c953",
+      "contract_version": 2,
+      "schema_contract": "tlc-yellow-v1",
+      "baseline_month": "2024-01",
+      "schema_classification": "compatible",
+      "missing_required_columns": [],
+      "added_columns": [],
+      "removed_columns": [],
+      "type_changes": [],
+      "unrecognized_added_columns": []
+    },
+    "2025-01": {
+      "month": "2025-01",
+      "retrieved_at_utc": "2026-10-15T19:58:34.554346+00:00",
+      "sources": [
+        {
+          "path": "yellow_tripdata_2025-01.parquet",
+          "url": "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet",
+          "sha256": "9af277e4c0d3f9deb30644da822981e1e7df6af58313170fd3aa8a474485488a"
+        },
+        {
+          "path": "taxi_zone_lookup.csv",
+          "url": "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv",
+          "sha256": "1a99e105092230f8620f301edcca7f80d3080642ff404d28ed957d3fa222c8ed"
+        }
+      ],
+      "trip_schema": [
+        {
+          "name": "VendorID",
+          "type": "INTEGER"
+        },
+        {
+          "name": "tpep_pickup_datetime",
+          "type": "TIMESTAMP"
+        },
+        {
+          "name": "tpep_dropoff_datetime",
+          "type": "TIMESTAMP"
+        },
+        {
+          "name": "passenger_count",
+          "type": "BIGINT"
+        },
+        {
+          "name": "trip_distance",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "RatecodeID",
+          "type": "BIGINT"
+        },
+        {
+          "name": "store_and_fwd_flag",
+          "type": "VARCHAR"
+        },
+        {
+          "name": "PULocationID",
+          "type": "INTEGER"
+        },
+        {
+          "name": "DOLocationID",
+          "type": "INTEGER"
+        },
+        {
+          "name": "payment_type",
+          "type": "BIGINT"
+        },
+        {
+          "name": "fare_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "extra",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "mta_tax",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "tip_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "tolls_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "improvement_surcharge",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "total_amount",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "congestion_surcharge",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "Airport_fee",
+          "type": "DOUBLE"
+        },
+        {
+          "name": "cbd_congestion_fee",
+          "type": "DOUBLE"
+        }
+      ],
+      "contract_sha256": "947e696d07ed07482a9d542febf5a345693e5a1a29b4db5875dc0fbdeca3c953",
+      "contract_version": 2,
+      "schema_contract": "tlc-yellow-v1",
+      "baseline_month": "2024-01",
+      "schema_classification": "compatible",
+      "missing_required_columns": [],
+      "added_columns": [
+        "cbd_congestion_fee"
+      ],
+      "removed_columns": [],
+      "type_changes": [],
+      "unrecognized_added_columns": []
+    }
+  }
+}

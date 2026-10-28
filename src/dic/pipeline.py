@@ -35,6 +35,12 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def _contract_file_sha256(path: Path) -> str:
+    """Hash text with normalized newlines so Windows and Unix share one contract identity."""
+    content = path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(content).hexdigest()
+
+
 def canonical_hash(rows: list[tuple[Any, ...]]) -> str:
     def norm(v: Any) -> Any:
         if v is None:
@@ -112,6 +118,8 @@ def load_contract(root: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
         raise ValueError("Contract join settings are incomplete")
     if join["diagnostic_join"] != "left_preserves_all_input_rows":
         raise ValueError("join.diagnostic_join must be left_preserves_all_input_rows")
+    if join["key"] != "PULocationID":
+        raise ValueError("join.key must be PULocationID for the current pickup-zone aggregation")
     if join["key"] not in schema["columns"]:
         raise ValueError(f"Join key {join['key']} is not in the referenced schema")
     if join["cardinality"] not in {"many_to_one", "many_to_many"}:
@@ -122,7 +130,8 @@ def load_contract(root: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
         raise ValueError("join.unmatched_policy must be exclude or block")
     if not isinstance(join["key_non_null"], bool):
         raise ValueError("join.key_non_null must be a boolean")
-    hash_payload = {"pipeline.yaml": sha256(yaml_path), "schema": sha256(schema_path)}
+    hash_payload = {"pipeline.yaml": _contract_file_sha256(yaml_path),
+                    "schema": _contract_file_sha256(schema_path)}
     contract_hash = hashlib.sha256(json.dumps(hash_payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return contract, schema, contract_hash
 
@@ -271,10 +280,11 @@ def _rows(con: duckdb.DuckDBPyConnection, query: str) -> list[tuple[Any, ...]]:
 
 
 def run(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = None,
-       reference_lookup: Path | None = None) -> dict[str, Any]:
+       reference_lookup: Path | None = None, _test_failpoint: str | None = None) -> dict[str, Any]:
     args = {"trips_path": str(trips_path.resolve()), "lookup_path": str(lookup_path.resolve()),
             "root": str(root.resolve()), "fault_id": fault_id,
-            "reference_lookup": str(reference_lookup.resolve()) if reference_lookup else None}
+            "reference_lookup": str(reference_lookup.resolve()) if reference_lookup else None,
+            "test_failpoint": _test_failpoint}
     completed = subprocess.run([sys.executable, "-m", "dic.worker"], input=json.dumps(args),
                                text=True, capture_output=True, cwd=root)
     if completed.returncode:
@@ -286,7 +296,7 @@ def run(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = 
 
 
 def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = None,
-                   reference_lookup: Path | None = None) -> dict[str, Any]:
+                   reference_lookup: Path | None = None, test_failpoint: str | None = None) -> dict[str, Any]:
     started = time.perf_counter()
     contract, schema_contract, contract_hash = load_contract(root)
     contract_id = contract["contract_id"]
@@ -405,6 +415,8 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
                "diagnostic_join": "diagnostic", "trip_enriched": "trip_enriched", "daily_zone_metrics": "daily_zone_metrics"}[name]
         target = (stage / f"{name}.parquet").as_posix().replace("'", "''")
         con.execute(f"COPY (SELECT * FROM {src} ORDER BY {order}) TO '{target}' (FORMAT PARQUET)")
+        if test_failpoint == "after_first_materialization" and name == "clean_trips":
+            raise RuntimeError("injected failure after first output materialization")
         n, h = con.execute(f"SELECT count(*), coalesce(sum(hash(t)::HUGEINT), 0) FROM {src} t").fetchone()
         outputs[name] = f"rows={n};logical_hash={h}"
     output_materialization_seconds = time.perf_counter() - materialization_started
@@ -458,6 +470,8 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
     _write_json(stage / "manifest.json", manifest)
     _write_json(stage / "report.json", report)
     if not contract_failed:
+        if test_failpoint == "invalid_publication_report":
+            report["schema_version"] = "invalid-report-version"
         _publish(stage, root / "data" / "published", run_id, report)
     con.close()
     return report
@@ -468,6 +482,106 @@ def validate_report(report: dict[str, Any]) -> None:
     schema = json.loads(schema_path.read_text(encoding="utf8"))
     jsonschema.Draft202012Validator.check_schema(schema)
     jsonschema.validate(report, schema)
+
+
+def collect_orphaned_staging(root: Path, older_than_hours: float = 24, delete: bool = False) -> dict[str, Any]:
+    """List or remove old, incomplete run directories; completed evidence is never collected."""
+    root = root.resolve()
+    if not (root / ".git").exists() or not (root / "pyproject.toml").is_file():
+        raise ValueError("Garbage collection requires the repository root containing .git and pyproject.toml")
+    if older_than_hours <= 0:
+        raise ValueError("older_than_hours must be positive")
+    runs = root / "data" / "runs"
+    published = root / "data" / "published"
+    if runs.is_symlink() or published.is_symlink():
+        raise ValueError("Garbage collection refuses symlinked run or publication directories")
+    def read_current() -> str | None:
+        path = published / "CURRENT"
+        if not path.is_file():
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8")).get("run_id")
+        except (OSError, json.JSONDecodeError):
+            return None
+
+    current_id = read_current()
+    published_ids = {p.name for p in published.iterdir() if p.is_dir()} if published.is_dir() else set()
+    cutoff = time.time() - older_than_hours * 3600
+    candidates: list[Path] = []
+    if runs.is_dir():
+        for path in runs.iterdir():
+            if (path.is_symlink() or not path.is_dir() or
+                    not re.fullmatch(r"[0-9a-f]{32}", path.name) or
+                    path.name == current_id or path.name in published_ids):
+                continue
+            if (path / "report.json").exists() or (path / "manifest.json").exists():
+                continue
+            try:
+                if path.stat().st_mtime <= cutoff:
+                    candidates.append(path)
+            except FileNotFoundError:
+                continue
+
+    required_tables = {"clean_trips.parquet", "trip_enriched.parquet", "daily_zone_metrics.parquet"}
+    if published.is_dir():
+        for path in published.iterdir():
+            if path.is_symlink():
+                continue
+            if path.is_dir() and re.fullmatch(r"[0-9a-f]{32}", path.name) and path.name != current_id:
+                complete = ((path / "manifest.json").is_file() and (path / "report.json").is_file()
+                            and required_tables <= {child.name for child in path.iterdir() if child.is_file()})
+                if not complete:
+                    try:
+                        if path.stat().st_mtime <= cutoff:
+                            candidates.append(path)
+                    except FileNotFoundError:
+                        continue
+            elif path.is_file() and (path.name == "CURRENT.tmp" or
+                                     re.fullmatch(r"CURRENT\.[0-9a-f]{32}\.tmp", path.name)):
+                try:
+                    if path.stat().st_mtime <= cutoff:
+                        candidates.append(path)
+                except FileNotFoundError:
+                    continue
+
+    removed: list[str] = []
+    if delete:
+        for path in candidates:
+            # Recheck selection and references immediately before deletion.
+            current_id = read_current()
+            published_ids = {p.name for p in published.iterdir() if p.is_dir()} if published.is_dir() else set()
+            try:
+                if path.stat().st_mtime > cutoff:
+                    continue
+            except FileNotFoundError:
+                continue
+            relative = path.relative_to(root)
+            if relative.parent == Path("data/runs"):
+                if (path.is_symlink() or not re.fullmatch(r"[0-9a-f]{32}", path.name) or
+                        path.name == current_id or path.name in published_ids or not path.is_dir()):
+                    continue
+                if (path / "report.json").exists() or (path / "manifest.json").exists():
+                    continue
+                shutil.rmtree(path)
+            elif relative.parent == Path("data/published") and path.is_dir():
+                if (path.is_symlink() or not re.fullmatch(r"[0-9a-f]{32}", path.name) or
+                        path.name == current_id):
+                    continue
+                complete = ((path / "manifest.json").is_file() and (path / "report.json").is_file()
+                            and required_tables <= {child.name for child in path.iterdir() if child.is_file()})
+                if complete:
+                    continue
+                shutil.rmtree(path)
+            elif relative.parent == Path("data/published") and path.is_file():
+                if path.name != "CURRENT.tmp" and not re.fullmatch(r"CURRENT\.[0-9a-f]{32}\.tmp", path.name):
+                    continue
+                shutil.rmtree(path, ignore_errors=True) if path.is_dir() else path.unlink(missing_ok=True)
+            else:
+                continue
+            removed.append(relative.as_posix())
+    return {"mode": "delete" if delete else "dry_run",
+            "older_than_hours": older_than_hours,
+            "candidates": [p.relative_to(root).as_posix() for p in candidates], "removed": removed}
 
 
 def _publish(stage: Path, published: Path, run_id: str, report: dict[str, Any], failpoint: str | None = None) -> None:

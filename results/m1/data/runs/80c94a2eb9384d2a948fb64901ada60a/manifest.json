@@ -1,0 +1,40 @@
+{
+  "manifest_version": "dic-manifest-v1",
+  "run_id": "80c94a2eb9384d2a948fb64901ada60a",
+  "inputs": {
+    "trips_sha256": "c4d59da7bbc8abaeeeb1727947ee93d9891a71acb42854bd80db1571b2030510",
+    "lookup_sha256": "1a99e105092230f8620f301edcca7f80d3080642ff404d28ed957d3fa222c8ed",
+    "reference_lookup_sha256": "1a99e105092230f8620f301edcca7f80d3080642ff404d28ed957d3fa222c8ed"
+  },
+  "versions": {
+    "compiler": "0.1.0",
+    "python": "3.13.15",
+    "duckdb": "1.2.2",
+    "contract": "2",
+    "cleaning": "2"
+  },
+  "contract_id": "dic-taxi-pipeline-v1",
+  "contract_version": 2,
+  "contract_sha256": "947e696d07ed07482a9d542febf5a345693e5a1a29b4db5875dc0fbdeca3c953",
+  "configuration_version": "pipeline-v2",
+  "row_counts": {
+    "raw_trips": 2964624,
+    "clean_trips": 2870188,
+    "diagnostic_left_join": 2870188,
+    "matched_rows": 2870188,
+    "unmatched_rows": 0,
+    "multiple_match_input_rows": 0
+  },
+  "logical_output_hashes": {
+    "clean_trips": "rows=2870188;logical_hash=26490451740393269596323632",
+    "diagnostic_join": "rows=2870188;logical_hash=26463450733751842287672676",
+    "trip_enriched": "rows=2870188;logical_hash=26463450733751842287672676",
+    "daily_zone_metrics": "rows=6859;logical_hash=62962878196720618869686"
+  },
+  "runtimes_seconds": {
+    "total_pipeline_seconds": 7.47238,
+    "validation_seconds": 0.583536,
+    "output_materialization_seconds": 4.82861,
+    "publication_seconds": 0.025758
+  }
+}

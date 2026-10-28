@@ -1,0 +1,38 @@
+{
+  "manifest_version": "dic-publication-v1",
+  "run_id": "873ed28085ed4b5a91009b9dc6f8797a",
+  "tables": [
+    "clean_trips",
+    "trip_enriched",
+    "daily_zone_metrics"
+  ],
+  "hashes": {
+    "clean_trips": "rows=2870188;logical_hash=26490451740393269596323632",
+    "diagnostic_join": "rows=2870188;logical_hash=26463450733751842287672676",
+    "trip_enriched": "rows=2870188;logical_hash=26463450733751842287672676",
+    "daily_zone_metrics": "rows=6859;logical_hash=62962878196720618869686"
+  },
+  "inputs": {
+    "trips_sha256": "c4d59da7bbc8abaeeeb1727947ee93d9891a71acb42854bd80db1571b2030510",
+    "lookup_sha256": "1a99e105092230f8620f301edcca7f80d3080642ff404d28ed957d3fa222c8ed",
+    "reference_lookup_sha256": "1a99e105092230f8620f301edcca7f80d3080642ff404d28ed957d3fa222c8ed",
+    "contract_sha256": "947e696d07ed07482a9d542febf5a345693e5a1a29b4db5875dc0fbdeca3c953"
+  },
+  "versions": {
+    "compiler": "0.1.0",
+    "python": "3.13.15",
+    "duckdb": "1.2.2",
+    "contract": "2",
+    "cleaning": "2"
+  },
+  "contract_id": "dic-taxi-pipeline-v1",
+  "contract_version": 2,
+  "contract_sha256": "947e696d07ed07482a9d542febf5a345693e5a1a29b4db5875dc0fbdeca3c953",
+  "configuration_version": "pipeline-v2",
+  "runtimes_seconds": {
+    "total_pipeline_seconds": 7.06865,
+    "validation_seconds": 0.566071,
+    "output_materialization_seconds": 4.581431,
+    "publication_seconds": 0.025175
+  }
+}

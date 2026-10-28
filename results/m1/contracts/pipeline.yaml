@@ -1,0 +1,45 @@
+contract_id: dic-taxi-pipeline-v1
+contract_version: 2
+schema_file: tlc-yellow-v1.json
+schema_policy:
+  added_optional_columns: compatible
+  unrecognized_added_columns: review
+  removed_optional_columns: review
+  missing_required_columns: incompatible
+cleaning:
+  version: 2
+  rules:
+    - id: pickup_timestamp_present
+      column: tpep_pickup_datetime
+      operator: not_null
+    - id: pickup_timestamp_parseable
+      column: tpep_pickup_datetime
+      operator: parseable_timestamp
+    - id: dropoff_timestamp_present
+      column: tpep_dropoff_datetime
+      operator: not_null
+    - id: dropoff_timestamp_parseable
+      column: tpep_dropoff_datetime
+      operator: parseable_timestamp
+    - id: pickup_zone_present
+      column: PULocationID
+      operator: not_null
+    - id: nonnegative_fare
+      column: fare_amount
+      operator: ">="
+      cast_type: decimal_18_2
+      value: 0
+    - id: positive_distance
+      column: trip_distance
+      operator: ">"
+      cast_type: double
+      value: 0
+join:
+  key: PULocationID
+  lookup_key: LocationID
+  cardinality: many_to_one
+  cardinality_severity: block
+  lookup_uniqueness_severity: block
+  key_non_null: true
+  unmatched_policy: exclude
+  diagnostic_join: left_preserves_all_input_rows

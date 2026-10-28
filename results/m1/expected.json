@@ -1,0 +1,11 @@
+{
+  "evidence_version": "m1-evidence-v1",
+  "clean_run_id": "80c94a2eb9384d2a948fb64901ada60a",
+  "repeat_clean_run_id": "873ed28085ed4b5a91009b9dc6f8797a",
+  "fault_run_id": "5f63dbd47d0d417db0848436d5c1b791",
+  "published_run_id_after_fault": "873ed28085ed4b5a91009b9dc6f8797a",
+  "contract_version": 2,
+  "contract_sha256": "947e696d07ed07482a9d542febf5a345693e5a1a29b4db5875dc0fbdeca3c953",
+  "clean_trips_fingerprint": "rows=2870188;logical_hash=26490451740393269596323632",
+  "expected_injected_row_inflation": 50
+}

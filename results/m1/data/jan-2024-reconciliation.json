@@ -1,0 +1,23 @@
+{
+  "reconciliation_version": "jan-2024-parquet-reconciliation-v1",
+  "clean_run_id": "80c94a2eb9384d2a948fb64901ada60a",
+  "fault_run_id": "5f63dbd47d0d417db0848436d5c1b791",
+  "clean_manifest": "data/runs/80c94a2eb9384d2a948fb64901ada60a/manifest.json",
+  "fault_manifest": "data/runs/5f63dbd47d0d417db0848436d5c1b791/manifest.json",
+  "contract_sha256": "947e696d07ed07482a9d542febf5a345693e5a1a29b4db5875dc0fbdeca3c953",
+  "clean_diagnostic_rows": 2870188,
+  "fault_diagnostic_rows": 2870238,
+  "matching_input_rows_for_M1": 50,
+  "expected_row_inflation": 50,
+  "observed_row_inflation": 50,
+  "affected_daily_zone_groups": 22,
+  "total_trip_count_delta": 50,
+  "total_revenue_delta": "4134.35",
+  "average_fares_unchanged_in_all_affected_groups": true,
+  "report_aggregate_deltas_match_parquet": true,
+  "publication_pointer_preserved": true,
+  "limitations": [
+    "One injected join fault is a plumbing and attribution test, not a recall or false-positive estimate.",
+    "Peak memory is measured for each dedicated experiment subprocess and may be unavailable on unsupported platforms."
+  ]
+}
