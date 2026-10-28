@@ -179,3 +179,12 @@ def test_manifest_may_omit_derived_report_counts_but_not_contradict_them(tmp_pat
     bad = verifier.verify_bundle(_make_evidence(tmp_path / "bad", manifest_clean_trips=5), ROOT)
     assert bad["valid"] is False
     assert any("manifest row counts mismatch" in error for error in bad["errors"])
+
+
+def test_committed_m1_evidence_verifies_from_a_fresh_checkout():
+    # Catches line-ending conversion (e.g. core.autocrlf on Windows) breaking the committed checksums.
+    evidence = ROOT / "results" / "m1"
+    if not evidence.is_dir():
+        pytest.skip("results/m1 is not present in this checkout")
+    result = verifier.verify_bundle(evidence, ROOT)
+    assert result["valid"] is True, result["errors"]

@@ -10,6 +10,11 @@ from decimal import Decimal
 from pathlib import Path
 
 
+def copy_lf(source: Path, target: Path) -> None:
+    """Copy a text file with LF line endings so bundle bytes and checksums match what Git stores."""
+    target.write_bytes(source.read_bytes().replace(b"\r\n", b"\n"))
+
+
 def digest(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as stream:
@@ -66,12 +71,12 @@ def main() -> None:
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "contracts").mkdir()
     (destination / "schemas").mkdir()
-    shutil.copy2(contract_dir / "pipeline.yaml", destination / "contracts" / "pipeline.yaml")
-    shutil.copy2(contract_dir / "tlc-yellow-v1.json", destination / "contracts" / "tlc-yellow-v1.json")
+    copy_lf(contract_dir / "pipeline.yaml", destination / "contracts" / "pipeline.yaml")
+    copy_lf(contract_dir / "tlc-yellow-v1.json", destination / "contracts" / "tlc-yellow-v1.json")
     report_schema = source / "schemas" / "report-v2.schema.json"
     if not report_schema.is_file():
         report_schema = root / "schemas" / "report-v2.schema.json"
-    shutil.copy2(report_schema, destination / "schemas" / "report-v2.schema.json")
+    copy_lf(report_schema, destination / "schemas" / "report-v2.schema.json")
 
     paths = ["data/source-manifest.json", "data/jan-2024-reconciliation.json",
              "data/clean_report.json", "data/fault_report.json", "data/published/CURRENT"]
@@ -84,7 +89,7 @@ def main() -> None:
             raise SystemExit(f"Missing required Kaggle evidence file: {src}")
         target = destination / Path(relative)
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, target)
+        copy_lf(src, target)
 
     deltas = fault_report.get("downstream_aggregate_deltas", [])
     witness = {
@@ -95,7 +100,7 @@ def main() -> None:
         "revenue_delta": str(sum((Decimal(item["revenue_delta"]) for item in deltas), Decimal("0"))),
         "all_average_fares_unchanged": all(item["average_fare_unchanged"] for item in deltas),
     }
-    (destination / "reconciliation-witness.json").write_text(json.dumps(witness, indent=2) + "\n", encoding="utf-8")
+    (destination / "reconciliation-witness.json").write_text(json.dumps(witness, indent=2) + "\n", encoding="utf-8", newline="\n")
     expected = {
         "evidence_version": "m1-evidence-v1",
         "clean_run_id": clean_id,
@@ -107,7 +112,7 @@ def main() -> None:
         "clean_trips_fingerprint": clean_report["logical_output_hashes"]["clean_trips"],
         "expected_injected_row_inflation": 50,
     }
-    (destination / "expected.json").write_text(json.dumps(expected, indent=2) + "\n", encoding="utf-8")
+    (destination / "expected.json").write_text(json.dumps(expected, indent=2) + "\n", encoding="utf-8", newline="\n")
 
     archive = args.source_archive.resolve() if args.source_archive else root / "experiments" / "kaggle_upload" / "data-integrity-compiler-source.zip"
     notebook = root / "experiments" / "kaggle_upload" / "kaggle_m1_validation.ipynb"
@@ -132,7 +137,7 @@ def main() -> None:
                   "notebook_sha256": digest(notebook) if notebook.is_file() else None,
                   "kaggle_notebook_version": args.kaggle_notebook_version or source_provenance.get("kaggle_notebook_version"),
                   "full_parquet_artifacts_included": False}
-    (destination / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
+    (destination / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8", newline="\n")
     readme = (
         "# M1 historical evidence\n\n"
         "This bundle preserves the January clean controls and injected join-fault reports, manifests, source metadata, "
@@ -142,10 +147,10 @@ def main() -> None:
         "The Kaggle platform notebook version was not present in the downloaded export; the notebook content hash is "
         "recorded in `provenance.json`.\n"
     )
-    (destination / "README.md").write_text(readme, encoding="utf-8")
+    (destination / "README.md").write_text(readme, encoding="utf-8", newline="\n")
     checksums = {str(p.relative_to(destination)).replace("\\", "/"): digest(p)
                  for p in sorted(destination.rglob("*")) if p.is_file()}
-    (destination / "SHA256SUMS.json").write_text(json.dumps(checksums, indent=2) + "\n", encoding="utf-8")
+    (destination / "SHA256SUMS.json").write_text(json.dumps(checksums, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"Evidence bundle created at {destination}")
 
 
