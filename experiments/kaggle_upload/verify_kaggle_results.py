@@ -103,9 +103,9 @@ def verify_bundle(path: Path, repo_root: Path | None = None) -> dict:
         require(isinstance(provenance.get(key), str) and len(provenance[key]) == 64
                 and all(char in "0123456789abcdef" for char in provenance[key].lower()),
                 f"provenance {key} is missing or malformed")
-    require(isinstance(provenance.get("kaggle_notebook_version"), str)
-            and bool(provenance["kaggle_notebook_version"].strip()),
-            "Kaggle notebook version is missing")
+    require(isinstance(provenance.get("kaggle_run_label"), str)
+            and bool(provenance["kaggle_run_label"].strip()),
+            "Kaggle run label is missing")
     schema = bundle.json("schemas/report-v2.schema.json")
     jsonschema.Draft202012Validator.check_schema(schema)
 

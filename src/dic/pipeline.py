@@ -491,18 +491,30 @@ def collect_orphaned_staging(root: Path, older_than_hours: float = 24, delete: b
         raise ValueError("Garbage collection requires the repository root containing .git and pyproject.toml")
     if older_than_hours <= 0:
         raise ValueError("older_than_hours must be positive")
-    runs = root / "data" / "runs"
-    published = root / "data" / "published"
-    if runs.is_symlink() or published.is_symlink():
-        raise ValueError("Garbage collection refuses symlinked run or publication directories")
+    data = root / "data"
+    runs = data / "runs"
+    published = data / "published"
+    for directory in (data, runs, published):
+        if directory.is_symlink():
+            raise ValueError("Garbage collection refuses symlinked data, run, or publication directories")
+        if directory.exists() and not directory.resolve().is_relative_to(root):
+            raise ValueError("Garbage collection refuses paths outside the repository root")
     def read_current() -> str | None:
         path = published / "CURRENT"
-        if not path.is_file():
+        if not path.exists() and not path.is_symlink():
             return None
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("Garbage collection refuses an invalid CURRENT pointer")
         try:
-            return json.loads(path.read_text(encoding="utf-8")).get("run_id")
-        except (OSError, json.JSONDecodeError):
-            return None
+            pointer = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError) as exc:
+            raise ValueError("Garbage collection cannot read CURRENT; refusing deletion") from exc
+        except json.JSONDecodeError as exc:
+            raise ValueError("Garbage collection found a malformed CURRENT pointer; refusing deletion") from exc
+        run_id = pointer.get("run_id") if isinstance(pointer, dict) else None
+        if not isinstance(run_id, str) or not re.fullmatch(r"[0-9a-f]{32}", run_id):
+            raise ValueError("Garbage collection found a malformed CURRENT pointer; refusing deletion")
+        return run_id
 
     current_id = read_current()
     published_ids = {p.name for p in published.iterdir() if p.is_dir()} if published.is_dir() else set()
@@ -550,6 +562,8 @@ def collect_orphaned_staging(root: Path, older_than_hours: float = 24, delete: b
             # Recheck selection and references immediately before deletion.
             current_id = read_current()
             published_ids = {p.name for p in published.iterdir() if p.is_dir()} if published.is_dir() else set()
+            if path.is_symlink() or not path.resolve().is_relative_to(root):
+                continue
             try:
                 if path.stat().st_mtime > cutoff:
                     continue

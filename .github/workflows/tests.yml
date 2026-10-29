@@ -2,7 +2,7 @@ name: tests
 
 on:
   push:
-    branches: [main, m1-1-closure]
+    branches: [main]
   pull_request:
 
 jobs:

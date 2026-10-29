@@ -3,8 +3,8 @@
   "commit_sha": "18bfea91f84797b6c0d50d144b111fb7f90c0b79",
   "tree_sha": "6b595532be050291759823833ba4028c1370e8df",
   "source_archive_sha256": "b0f0b0a66da3c01bf064e331ab3e5d76e46cde2af0fa219b642830427db83d9d",
-  "kaggle_notebook_version": "m1-1-run-1",
-  "notebook_sha256": "9a32cef729bd8885037f9c71bc865de456e17b5112ca73897e137f1835d2e21b",
+  "kaggle_run_label": "m1-1-run-1",
+  "notebook_sha256": "cd802c06c7fec8c3ea761287b8eb287275d08e0d50e7eb3723c5a395062a3685",
   "m1_verified_tree_hash": "3a4fb4a6c9066532167eed5d946207d084309e6f",
   "full_parquet_artifacts_included": false
 }
