@@ -43,8 +43,8 @@ def main() -> None:
                         help="directory containing the exact contracts/pipeline.yaml and tlc-yellow-v1.json used for this run")
     parser.add_argument("--source-archive", type=Path,
                         help="exact source archive uploaded to Kaggle, for provenance hashing")
-    parser.add_argument("--kaggle-notebook-version",
-                        help="platform version identifier recorded from the run metadata")
+    parser.add_argument("--kaggle-run-label",
+                        help="human-assigned label for the Kaggle execution; not a platform version")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     source = args.source.resolve()
@@ -135,8 +135,10 @@ def main() -> None:
                   "m1_verified_tree_hash": tree_hash,
                   "source_archive_sha256": recorded_archive_hash or actual_archive_hash,
                   "notebook_sha256": digest(notebook) if notebook.is_file() else None,
-                  "kaggle_notebook_version": args.kaggle_notebook_version or source_provenance.get("kaggle_notebook_version"),
+                  "kaggle_run_label": (args.kaggle_run_label or source_provenance.get("kaggle_run_label")
+                                       or source_provenance.get("kaggle_notebook_version")),
                   "full_parquet_artifacts_included": False}
+    provenance.pop("kaggle_notebook_version", None)
     (destination / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8", newline="\n")
     readme = (
         "# M1 historical evidence\n\n"
@@ -144,8 +146,9 @@ def main() -> None:
         "contract, report schema, and a compact aggregate witness. It excludes raw TLC inputs and materialized Parquet "
         "outputs. The verifier checks checksums, report and manifest consistency, contract identity, publication state, "
         "and the recorded aggregate sums. It cannot independently reproduce row-level results without the Parquet files.\n\n"
-        "The Kaggle platform notebook version was not present in the downloaded export; the notebook content hash is "
-        "recorded in `provenance.json`.\n"
+        "`kaggle_run_label` is a human-assigned run label, not a Kaggle platform version. The notebook content hash "
+        "identifies the exact committed notebook used for this run. The compact witness establishes internal "
+        "consistency and recorded aggregates, not a fresh row-level reconstruction; that requires the Parquet files.\n"
     )
     (destination / "README.md").write_text(readme, encoding="utf-8", newline="\n")
     checksums = {str(p.relative_to(destination)).replace("\\", "/"): digest(p)

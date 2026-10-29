@@ -100,7 +100,7 @@ def _make_evidence(root: Path, manifest_clean_trips: int = 4) -> Path:
     _write_json(bundle / "provenance.json",
                 {"m1_verified_tree_hash": "a" * 40, "commit_sha": "b" * 40,
                  "tree_sha": "c" * 40, "source_archive_sha256": "d" * 64,
-                 "notebook_sha256": "e" * 64, "kaggle_notebook_version": "17"})
+                 "notebook_sha256": "e" * 64, "kaggle_run_label": "m1-1-run-1"})
     (bundle / "README.md").write_text("Test evidence only.\n", encoding="utf-8")
     sums = {p.relative_to(bundle).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
             for p in sorted(bundle.rglob("*")) if p.is_file()}
@@ -188,3 +188,25 @@ def test_committed_m1_evidence_verifies_from_a_fresh_checkout():
         pytest.skip("results/m1 is not present in this checkout")
     result = verifier.verify_bundle(evidence, ROOT)
     assert result["valid"] is True, result["errors"]
+
+
+def test_m2a_phase_zero_catalog_matches_schema_and_split_design():
+    root = Path(__file__).parents[1]
+    catalog_schema = json.loads((root / "schemas/fault-catalog-v1.schema.json").read_text())
+    catalog = json.loads((root / "experiments/m2a/catalog/fault_catalog_v1.json").read_text())
+    jsonschema.validate(catalog, catalog_schema)
+    assert len(catalog["mechanisms"]) == 8
+    by_stage = {}
+    for mechanism in catalog["mechanisms"]:
+        by_stage.setdefault(mechanism["stage"], []).append(mechanism)
+        assert set(mechanism["severity_parameters"]) == {"low", "medium", "high"}
+        assert mechanism["seeds"] == [11, 29, 47]
+        assert mechanism["oracle"]["validated_fixture"]
+        assert mechanism["detectability"]["rationale"]
+    assert set(by_stage) == {"ingestion", "cleaning", "join", "aggregation"}
+    assert all(len(mechanisms) == 2 for mechanisms in by_stage.values())
+    for split in ("development", "held_out"):
+        selected = [item for item in catalog["mechanisms"] if item["split"] == split]
+        assert {item["stage"] for item in selected} == set(by_stage)
+        assert {item["detectability_class"] for item in selected} >= {
+            "contract_visible", "contract_silent_externally_detectable"}

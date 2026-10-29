@@ -2,7 +2,7 @@ name: tests
 
 on:
   push:
-    branches: [main, m1-1-closure]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -28,5 +28,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-lock.txt
           python -m pip install --no-deps -e .
+      - name: Build wheel
+        run: python -m pip wheel --no-deps --wheel-dir dist .
       - name: Run tests
         run: python -m pytest -q

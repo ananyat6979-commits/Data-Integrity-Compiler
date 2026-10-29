@@ -13,14 +13,13 @@ import jsonschema
 import pytest
 
 from dic.pipeline import (_publish, canonical_hash, classify_schema, collect_orphaned_staging,
-                          evaluate, inject_m1, load_contract, measure_peak_working_set, run,
-                          validate_report)
+                          evaluate, inject_m1, load_contract, measure_peak_working_set, run)
 
 
 SCHEMA = Path(__file__).parents[1] / "schemas" / "report-v2.schema.json"
 
 
-def validate_report(report):
+def assert_report_shape(report):
     """Validate this versioned report schema's required fields and fixed enumerations."""
     schema = json.loads(SCHEMA.read_text())
     jsonschema.validate(report, schema)
@@ -42,7 +41,7 @@ def test_clean_passes_repeatably_and_report_validates(sample):
     assert one["row_counts"]["unmatched_rows"] == 1
     assert one["checks"][2]["passed"] is True
     assert one["logical_output_hashes"] == two["logical_output_hashes"]
-    validate_report(one)
+    assert_report_shape(one)
     current = json.loads((root / "data/published/CURRENT").read_text())
     assert current["run_id"] == two["run_id"]
 
@@ -66,7 +65,7 @@ def test_duplicate_m1_block_evidence_and_independent_effect(sample):
     assert impact["trip_count_delta"] == 2
     assert impact["revenue_delta"] == "30.00"
     assert impact["average_fare_unchanged"] is True
-    validate_report(report)
+    assert_report_shape(report)
     assert evaluate(Path(root / "data/runs" / report["run_id"] / "report.json"), fault["ground_truth"])["key_matches"]
     assert json.loads((root / "data/published/CURRENT").read_text())["run_id"] == good["run_id"]
     assert (root / "data/runs" / report["run_id"] / "report.json").is_file()
@@ -129,7 +128,8 @@ def test_preexisting_duplicate_is_reported_as_baseline_violation(sample):
 
 def test_runtime_schema_validator_rejects_invalid_reports():
     with pytest.raises(jsonschema.ValidationError):
-        validate_report({"schema_version": "dic-report-v1"})
+        from dic.pipeline import validate_report as production_validate_report
+        production_validate_report({"schema_version": "dic-report-v1"})
 
 
 def test_schema_classifier_distinguishes_compatible_review_and_incompatible():
@@ -374,17 +374,24 @@ def test_report_validation_failure_precedes_pointer_swap_and_records_error(sampl
 
 def test_mid_materialization_error_cleans_stage_and_next_run_succeeds(sample):
     trips, lookup, root = sample
+    prior = run(trips, lookup, root)
+    current_path = root / "data/published/CURRENT"
+    prior_current = current_path.read_bytes()
     runs = root / "data/runs"
     before = {p.name for p in runs.iterdir() if p.is_dir()} if runs.exists() else set()
     with pytest.raises(RuntimeError, match="after first output materialization"):
         run(trips, lookup, root, _test_failpoint="after_first_materialization")
     after = {p.name for p in runs.iterdir() if p.is_dir()} if runs.exists() else set()
     assert after == before
+    assert current_path.read_bytes() == prior_current
+    assert json.loads(current_path.read_text())["run_id"] == prior["run_id"]
     record = json.loads(max((root / "data/failures").glob("*.json"), key=lambda p: p.stat().st_mtime).read_text())
     assert record["status"] == "failed"
     assert record["error_type"] == "RuntimeError"
     assert record["staging_artifacts"] == ["clean_trips.parquet"]
-    assert run(trips, lookup, root)["outcome"] == "passed"
+    recovered = run(trips, lookup, root)
+    assert recovered["outcome"] == "passed"
+    assert json.loads(current_path.read_text())["run_id"] == recovered["run_id"]
 
 
 def test_gc_dry_run_and_delete_preserve_current_and_complete_evidence(sample):
@@ -421,3 +428,49 @@ def test_gc_dry_run_and_delete_preserve_current_and_complete_evidence(sample):
     assert current.read_bytes() == pointer
     assert (root / "data/runs" / blocked["run_id"] / "report.json").is_file()
     assert json.loads(current.read_text())["run_id"] == clean["run_id"]
+
+
+def test_gc_refuses_malformed_or_unreadable_current(sample, monkeypatch):
+    _, _, root = sample
+    (root / ".git").mkdir()
+    (root / "pyproject.toml").write_text("[project]\nname='fixture'\n")
+    runs = root / "data/runs"
+    published = root / "data/published"
+    runs.mkdir(parents=True)
+    published.mkdir(parents=True)
+    orphan = runs / ("a" * 32)
+    orphan.mkdir()
+    old = time.time() - 3 * 3600
+    os.utime(orphan, (old, old))
+    current = published / "CURRENT"
+    current.write_text("{malformed")
+    with pytest.raises(ValueError, match="malformed CURRENT"):
+        collect_orphaned_staging(root, older_than_hours=1, delete=True)
+    assert orphan.is_dir()
+
+    current.write_text(json.dumps({"run_id": "b" * 32}))
+    original_read_text = Path.read_text
+
+    def unreadable(path, *args, **kwargs):
+        if path == current:
+            raise OSError("simulated unreadable pointer")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", unreadable)
+    with pytest.raises(ValueError, match="cannot read CURRENT"):
+        collect_orphaned_staging(root, older_than_hours=1, delete=True)
+    assert orphan.is_dir()
+
+
+def test_gc_refuses_symlinked_data_directory(sample):
+    _, _, root = sample
+    (root / ".git").mkdir()
+    (root / "pyproject.toml").write_text("[project]\nname='fixture'\n")
+    outside = root.parent / "outside-data"
+    outside.mkdir()
+    try:
+        (root / "data").symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"directory symlinks are unavailable: {exc}")
+    with pytest.raises(ValueError, match="symlinked data"):
+        collect_orphaned_staging(root, older_than_hours=1, delete=True)
