@@ -192,8 +192,8 @@ def test_committed_m1_evidence_verifies_from_a_fresh_checkout():
 
 def test_m2a_phase_zero_catalog_matches_schema_and_split_design():
     root = Path(__file__).parents[1]
-    catalog_schema = json.loads((root / "schemas/fault-catalog-v1.schema.json").read_text())
-    catalog = json.loads((root / "experiments/m2a/catalog/fault_catalog_v1.json").read_text())
+    catalog_schema = json.loads((root / "schemas/fault-catalog-v2.schema.json").read_text())
+    catalog = json.loads((root / "experiments/m2a/catalog/fault_catalog_v2.json").read_text())
     jsonschema.validate(catalog, catalog_schema)
     assert len(catalog["mechanisms"]) == 8
     by_stage = {}
@@ -203,8 +203,15 @@ def test_m2a_phase_zero_catalog_matches_schema_and_split_design():
         assert mechanism["seeds"] == [11, 29, 47]
         assert mechanism["oracle"]["validated_fixture"]
         assert mechanism["detectability"]["rationale"]
+        assert mechanism["eligible_interventions"] == (
+            ["replace_input"] if mechanism["locus"] == "data_fault" else ["replace_transformation"]
+        )
     assert set(by_stage) == {"ingestion", "cleaning", "join", "aggregation"}
     assert all(len(mechanisms) == 2 for mechanisms in by_stage.values())
+    control = catalog["abstention_control"]
+    assert control["detectability_class"] == "underdetermined"
+    assert control["expected_detector_action"] == "abstain"
+    assert control["eligible_interventions"] == []
     for split in ("development", "held_out"):
         selected = [item for item in catalog["mechanisms"] if item["split"] == split]
         assert {item["stage"] for item in selected} == set(by_stage)

@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://data-integrity-compiler.invalid/schemas/fault-catalog-v2.schema.json",
+  "title": "Data Integrity Compiler fault catalog v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "catalog_version",
+    "dataset",
+    "case_design",
+    "mechanisms",
+    "abstention_control"
+  ],
+  "properties": {
+    "catalog_version": {
+      "const": "dic-fault-catalog-v2"
+    },
+    "dataset": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stages",
+        "severities",
+        "seeds",
+        "split_policy"
+      ],
+      "properties": {
+        "stages": {
+          "const": [
+            "ingestion",
+            "cleaning",
+            "join",
+            "aggregation"
+          ]
+        },
+        "severities": {
+          "const": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "seeds": {
+          "const": [
+            11,
+            29,
+            47
+          ]
+        },
+        "split_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "mechanisms": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "$ref": "#/$defs/mechanism"
+      }
+    },
+    "abstention_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fault_id",
+        "stage",
+        "locus",
+        "detectability_class",
+        "expected_detection",
+        "mechanism",
+        "detector_evidence",
+        "evaluator_evidence",
+        "expected_detector_action",
+        "eligible_interventions",
+        "score_policy"
+      ],
+      "properties": {
+        "fault_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]+$"
+        },
+        "stage": {
+          "enum": [
+            "ingestion",
+            "cleaning",
+            "join",
+            "aggregation"
+          ]
+        },
+        "locus": {
+          "enum": [
+            "code_fault",
+            "data_fault"
+          ]
+        },
+        "detectability_class": {
+          "const": "underdetermined"
+        },
+        "expected_detection": {
+          "const": false
+        },
+        "mechanism": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detector_evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluator_evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_detector_action": {
+          "const": "abstain"
+        },
+        "eligible_interventions": {
+          "const": []
+        },
+        "score_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "mechanism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fault_id",
+        "stage",
+        "locus",
+        "detectability_class",
+        "expected_detection",
+        "mechanism",
+        "severity_parameters",
+        "seeds",
+        "seed_policy",
+        "original_behavior",
+        "affected_scope",
+        "oracle",
+        "detectability",
+        "impact",
+        "split",
+        "eligible_interventions"
+      ],
+      "properties": {
+        "fault_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]+$"
+        },
+        "stage": {
+          "enum": [
+            "ingestion",
+            "cleaning",
+            "join",
+            "aggregation"
+          ]
+        },
+        "locus": {
+          "enum": [
+            "code_fault",
+            "data_fault"
+          ]
+        },
+        "detectability_class": {
+          "enum": [
+            "contract_visible",
+            "contract_silent_externally_detectable",
+            "underdetermined"
+          ]
+        },
+        "expected_detection": {
+          "type": "boolean"
+        },
+        "mechanism": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity_parameters": {
+          "type": "object",
+          "minProperties": 3,
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1
+          }
+        },
+        "seeds": {
+          "const": [
+            11,
+            29,
+            47
+          ]
+        },
+        "seed_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "original_behavior": {
+          "type": "string",
+          "minLength": 1
+        },
+        "affected_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "oracle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "independence_basis",
+            "validated_fixture",
+            "established_properties"
+          ],
+          "properties": {
+            "method": {
+              "type": "string",
+              "minLength": 1
+            },
+            "independence_basis": {
+              "type": "string",
+              "minLength": 1
+            },
+            "validated_fixture": {
+              "type": "string",
+              "minLength": 1
+            },
+            "established_properties": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "detectability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "supported",
+            "rationale",
+            "production_evidence"
+          ],
+          "properties": {
+            "supported": {
+              "type": "boolean"
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1
+            },
+            "production_evidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "impact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "metric",
+            "tolerance",
+            "zero_or_null_policy"
+          ],
+          "properties": {
+            "metric": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tolerance": {
+              "type": "string",
+              "minLength": 1
+            },
+            "zero_or_null_policy": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "split": {
+          "enum": [
+            "development",
+            "held_out"
+          ]
+        },
+        "eligible_interventions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "replace_transformation",
+              "replace_input"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
