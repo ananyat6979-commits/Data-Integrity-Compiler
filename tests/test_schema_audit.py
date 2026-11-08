@@ -43,7 +43,7 @@ def test_audit_records_counts_coverage_and_cohort_transitions(tmp_path):
     assert [c["months"] for c in report["cohorts"]] == [["2022-01", "2022-02"], ["2022-03"], ["2022-04"], ["2022-05"]]
     first = report["months"][0]
     assert "columns" not in first and first["cohort_id"] == "C1"
-    assert first["rows"] == 3 and first["rows_outside_month"] == 1
+    assert first["rows"] == 3 and first["rows_outside_month"] == 1 and first["rows_beyond_1_day_of_month"] == 1
     assert first["negative_fare_rows"] == 1 and first["nonpositive_distance_rows"] == 1
     assert first["nulls"]["PULocationID"] == 1 and first["pickup_location_id_range"] == [1, 4]
     assert len(first["sha256"]) == 64 and first["file"] == "yellow_tripdata_2022-01.parquet"
@@ -61,3 +61,18 @@ def test_audit_is_deterministic_and_fails_clearly_on_missing_files(tmp_path):
     assert audit.main(["--raw", str(tmp_path), "--start", "2022-01", "--end", "2022-01", "--out", str(out2)]) == 0
     assert out1.read_bytes() == out2.read_bytes() and b"\r\n" not in out1.read_bytes()
     assert audit.main(["--raw", str(tmp_path), "--start", "2022-01", "--end", "2022-03", "--out", str(tmp_path / "c.json")]) == 1
+
+
+def test_boundary_spill_is_separated_from_far_out_pickups(tmp_path):
+    path = tmp_path / "yellow_tripdata_2022-03.parquet"
+    target = path.as_posix().replace("'", "''")
+    duckdb.connect().execute(f"""COPY (SELECT * FROM (VALUES
+        (TIMESTAMP '2022-02-28 23:30:00', 1.0::DOUBLE),
+        (TIMESTAMP '2022-03-15 12:00:00', 2.0::DOUBLE),
+        (TIMESTAMP '2022-04-01 00:20:00', 3.0::DOUBLE),
+        (TIMESTAMP '2022-04-03 09:00:00', 4.0::DOUBLE),
+        (TIMESTAMP '2002-12-31 22:00:00', 5.0::DOUBLE)
+      ) t(tpep_pickup_datetime, fare_amount)) TO '{target}' (FORMAT PARQUET)""")
+    record = audit.audit_month(path, "2022-03")
+    assert record["rows_outside_month"] == 4          # two spill rows, one 2-day-late row, one junk row
+    assert record["rows_beyond_1_day_of_month"] == 2  # only the 2-day-late row and the 2002 row

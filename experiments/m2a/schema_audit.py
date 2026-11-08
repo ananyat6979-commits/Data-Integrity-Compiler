@@ -1,7 +1,7 @@
 """Read-only schema and source audit of NYC TLC Yellow Taxi monthly Parquet files.
 
 Records, per month: file size, SHA-256, row count, ordered column names and types, pickup-time
-coverage, null counts on key columns, and counts that mirror the declared cleaning rules. Months
+coverage (separating near-boundary spill from pickups more than one day outside the month), null counts on key columns, and counts that mirror the declared cleaning rules. Months
 with identical schemas are grouped into cohorts, and each transition between cohorts lists added,
 removed, retyped, and case-only-renamed columns. Raw files are never modified and no timestamps are
 written, so the same inputs always produce the same JSON.
@@ -66,8 +66,10 @@ def audit_month(path: Path, month: str) -> dict[str, Any]:
     labels = ["rows"]
     if "tpep_pickup_datetime" in names:
         expressions += ["min(tpep_pickup_datetime)::VARCHAR", "max(tpep_pickup_datetime)::VARCHAR",
-                        f"count(*) FILTER (WHERE strftime(tpep_pickup_datetime, '%Y-%m') <> '{month}')"]
-        labels += ["pickup_min", "pickup_max", "rows_outside_month"]
+                        f"count(*) FILTER (WHERE strftime(tpep_pickup_datetime, '%Y-%m') <> '{month}')",
+                        f"count(*) FILTER (WHERE tpep_pickup_datetime < (DATE '{month}-01' - INTERVAL 1 DAY) "
+                        f"OR tpep_pickup_datetime >= (DATE '{month}-01' + INTERVAL 1 MONTH + INTERVAL 1 DAY))"]
+        labels += ["pickup_min", "pickup_max", "rows_outside_month", "rows_beyond_1_day_of_month"]
     for column in NULL_COLUMNS:
         if column in names:
             expressions.append(f'count(*) FILTER (WHERE "{column}" IS NULL)')
@@ -94,6 +96,7 @@ def audit_month(path: Path, month: str) -> dict[str, Any]:
         "pickup_min": values.get("pickup_min"),
         "pickup_max": values.get("pickup_max"),
         "rows_outside_month": values.get("rows_outside_month"),
+        "rows_beyond_1_day_of_month": values.get("rows_beyond_1_day_of_month"),
         "nulls": {label.split(":", 1)[1]: value for label, value in values.items() if label.startswith("null:")},
         "negative_fare_rows": values.get("negative_fare_rows"),
         "nonpositive_distance_rows": values.get("nonpositive_distance_rows"),
@@ -155,7 +158,9 @@ def summarize(report: dict[str, Any]) -> str:
                      f"retyped={[x['column'] for x in t['type_changed']]} "
                      f"case_renames={[(x['from'], x['to']) for x in t['case_only_renames']]}")
     flagged = [(r["month"], r["rows_outside_month"]) for r in report["months"] if r["rows_outside_month"]]
-    lines.append(f"Months with pickups outside their month: {flagged or 'none'}")
+    far = [(r["month"], r["rows_beyond_1_day_of_month"]) for r in report["months"] if r["rows_beyond_1_day_of_month"]]
+    lines.append(f"Months with pickups outside their month (boundary spill plus far-out): {len(flagged)} of {len(report['months'])}")
+    lines.append(f"Pickups MORE than 1 day outside their month, by month: {far or 'none'}")
     lines.append("Month, rows, negative fares, non-positive distances, null PULocationID:")
     for r in report["months"]:
         lines.append(f"  {r['month']}  {r['rows']:>9}  {r['negative_fare_rows']}  {r['nonpositive_distance_rows']}  "
