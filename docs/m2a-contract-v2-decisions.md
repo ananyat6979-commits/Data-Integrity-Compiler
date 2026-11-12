@@ -48,7 +48,7 @@ Decision: exclude these drifting rate and null-share features from distribution 
 ## 4. Outstanding prerequisites
 
 - **P1, P1b (done).** See sections 5 and 6.
-- **P2.** Review the TLC data dictionary against the audit for the columns contract v2 will declare, and record any column whose meaning changed between cohorts.
+- **P2 (review complete with documented limits).** The review is recorded in `docs/m2a-contract-v2-data-dictionary-review.md`. It identifies the C3 congestion-fee addition and finds no documented meaning change for the C1/C2 fields. The available March 2025 dictionary does not establish historical validity of every code list, so contract v2 must preserve that limitation.
 - **P3.** Record the hours spent on each Phase 1 task from now on (needed for the November 24 decision).
 - **P4.** Define and freeze the within-month shape features, the trend-robust distance function and the alert thresholds, including how the thresholds are derived, using the 2022 warm-up months only for stability checks. This must be written down before any detector code is run on 2023 or 2024 months.
 - **P5.** Record the original source column names and types per file in contract v2 provenance (D1), next to the normalized semantic schema.
