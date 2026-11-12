@@ -50,7 +50,7 @@ Decision: exclude these drifting rate and null-share features from distribution 
 - **P1, P1b (done).** See sections 5 and 6.
 - **P2 (column comparison complete with documented limits).** The review is recorded in `docs/m2a-contract-v2-data-dictionary-review.md`, including all 20 audit columns, cohort spellings/types, field meanings and evidence limits.
 - **P3.** Start a simple per-task hours log now. Earlier Phase 0 and schema-audit time was not logged and will not be reconstructed. Record hours for remaining work for the November 24 progress review.
-- **P4.** Define and freeze the within-month shape features, the trend-robust distance function and the alert thresholds, including how the thresholds are derived, using the 2022 warm-up months only for stability checks. This must be written down before any detector code is run on 2023 or 2024 months.
+- **P4 (draft prepared, not complete).** Proposed features, distance, and 2022-only threshold derivation are documented in `docs/m2a-distribution-checks-p4-draft.md`. Numeric thresholds remain unset until the independent source review classifies eligible 2022 months. Review and hash the calibration artifact before any detector code is run on 2023 or 2024 months.
 - **P5.** Record the original source column names and types per file in contract v2 provenance (D1), next to the normalized semantic schema.
 
 ## 5. P1 result (months 2022-01 to 2023-01)
