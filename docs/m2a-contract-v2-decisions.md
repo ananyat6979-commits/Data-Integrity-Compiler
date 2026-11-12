@@ -1,7 +1,7 @@
 # M2a Contract v2 Decision Note
 
 **Status:** D1, D5, D6 and D8 are decided by the owner (recorded in this PR). D2, D3, D4 and D7 remain proposals. Contract v2 and the M2a protocol are not frozen: section 4 lists what remains, and oracle definitions and implementation details still need their own review.
-**Evidence:** `experiments/m2a/audit/schema_audit_2022-01_2025-12.json` (48 monthly Yellow Taxi files, 2022-01 to 2025-12, SHA-256 per file; the 2024-01, 2024-02 and 2025-01 hashes equal those recorded in the M1 evidence).
+**Evidence:** experiments/m2a/audit/schema_audit_2022-01_2025-12.json and experiments/m2a/audit/paired_null_audit_2022-01_2025-12.json. Both cover 48 monthly Yellow Taxi files from 2022-01 to 2025-12 and record source SHA-256 values. The paired-null report matches the schema audit on every monthly source hash and row count. The 2024-01, 2024-02 and 2025-01 hashes match the M1 evidence.
 **Scope:** contract v2 is a new contract. M1 evidence stays tied to the M1 contract hash; v2 files live under `contracts/v2/` so the v1 hash cannot change.
 
 ## 1. What the audit established
@@ -19,7 +19,7 @@
 
 ## 2. Proposed decisions
 
-**D1. Schema cohorts (DECIDED: yes).** Treat C1 and C2 as one *semantic* cohort: match column names case-insensitively, canonical `INTEGER` for ID columns, canonical `BIGINT` for `passenger_count` and `RatecodeID`. Normalization is applied when reading; contract v2 provenance preserves each file's original column names and types, so the historical schema differences are never erased. Basis: P1 (section 5) found no non-integral and no NaN values in either `DOUBLE` column across the 13 C1 months and all IDs fit `INTEGER`; P1b (section 6) found no discontinuity at the boundary (null share 2.34% in 2023-01, 2.64% in 2023-02).
+**D1. Schema cohorts (DECIDED: yes).** Treat C1 and C2 as one *semantic* cohort: match column names case-insensitively, canonical `INTEGER` for ID columns, canonical `BIGINT` for `passenger_count` and `RatecodeID`. Normalization is applied when reading; contract v2 provenance preserves each file's original column names and types, so the historical schema differences are never erased. Basis: P1 (section 5) found no non-integral and no NaN values in either `DOUBLE` column across the 13 C1 months and all IDs fit `INTEGER`; P1b (section 6) found no discontinuity at the boundary (null share 2.34% in 2023-01, 2.64% in 2023-02). The paired-null report confirms zero one-sided-null rows and zero NaNs across all 48 files.
 
 **D2. Date coverage.** Boundary spill (pickup within one day of the file's month) is benign: counted and reported, never an alert. Rows more than one day outside the month are `far_out_pickup` source anomalies. Contract v2 adds a cleaning rule that rejects them under its own rule ID, with per-month counts; the v2 retention-completeness check covers it. M1 has no date rule, so these rows currently reach `daily_zone_metrics` as stray dates. The far-out count must not be used as a distribution feature: it falls year over year (612, 323, 49, 8).
 
@@ -62,4 +62,4 @@ Decision: exclude these drifting rate and null-share features from distribution 
 
 ## 6. P1b result (null share of `passenger_count` and `RatecodeID`, months 2023-02 to 2024-12)
 
-The two columns have identical null shares in every month: 2.64%, 2.57%, 2.76%, 2.90%, 3.02%, 2.93%, 3.11% (2023-02 to 2023-08); 4.93%, 4.40%, 3.97%, 5.33% (2023-09 to 2023-12); 4.73%, 6.17%, 11.90%, 11.63%, 10.87%, 11.61%, 9.07%, 8.68%, 13.31%, 10.27%, 10.25%, 8.89% (2024-01 to 2024-12). There is no jump at the C1 to C2 boundary, but the share roughly doubles between 2024-02 and 2024-03 and stays elevated. 2025 has not been audited for this feature.
+The two columns have identical null shares in every month: 2.64%, 2.57%, 2.76%, 2.90%, 3.02%, 2.93%, 3.11% (2023-02 to 2023-08); 4.93%, 4.40%, 3.97%, 5.33% (2023-09 to 2023-12); 4.73%, 6.17%, 11.90%, 11.63%, 10.87%, 11.61%, 9.07%, 8.68%, 13.31%, 10.27%, 10.25%, 8.89% (2024-01 to 2024-12). There is no jump at the C1 to C2 boundary, but the share roughly doubles between 2024-02 and 2024-03 and stays elevated. The paired-null report includes 2025 row-level null and NaN counts, but 2025 remains excluded from D5 distribution-alert scoring.

@@ -28,9 +28,13 @@ The dictionary defines field meaning, not source-data correctness. Negative fare
 
 ## Paired-null evidence for D1
 
-Equal marginal null counts alone do not prove row-level co-occurrence. A read-only DuckDB check over each of the 36 C1 and C2 files, from 2022-01 through 2024-12, counted rows where exactly one of `passenger_count` and `RatecodeID` was null. The result was zero in every file. The null count for each column therefore equals the paired-null count in these files. The same query found zero NaN values in either column in all 36 files.
+Equal marginal null counts alone do not prove row-level co-occurrence. The reproducible audit in experiments/m2a/paired_null_audit.py was run over all 48 files, from 2022-01 through 2025-12. The retained report, experiments/m2a/audit/paired_null_audit_2022-01_2025-12.json, records each source file hash, row count, marginal null counts, paired-null count, one-sided-null count, and NaN counts. It reports zero one-sided-null rows and zero NaNs in every month, including C3. Each source hash and row count matches the corresponding record in the schema audit.
 
-This supports the paired-null statement for C1 and C2. It does not establish the same property for C3, which has not been included in this check. Keep the query and per-month results with the contract v2 provenance before freezing the contract.
+Reproduce it with:
+
+    python experiments/m2a/paired_null_audit.py --raw data/raw --start 2022-01 --end 2025-12 --out experiments/m2a/audit/paired_null_audit_2022-01_2025-12.json
+
+This is a direct DuckDB data-property check, using the same engine as the schema audit. It is not an independent oracle for field semantics or pipeline correctness.
 
 ## Contract implications
 

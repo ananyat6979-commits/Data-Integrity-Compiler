@@ -1,0 +1,830 @@
+{
+  "audit_version": 1,
+  "months": [
+    {
+      "both_null_rows": 71503,
+      "bytes": 38139949,
+      "file": "yellow_tripdata_2022-01.parquet",
+      "month": "2022-01",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 71503,
+        "passenger_count": 71503
+      },
+      "one_sided_null_rows": 0,
+      "rows": 2463931,
+      "sha256": "797d6f008e67c3e3371b7f957ab97dbc2b38a9fb0ac083cb5eae4b0297b32372"
+    },
+    {
+      "both_null_rows": 101738,
+      "bytes": 45616512,
+      "file": "yellow_tripdata_2022-02.parquet",
+      "month": "2022-02",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 101738,
+        "passenger_count": 101738
+      },
+      "one_sided_null_rows": 0,
+      "rows": 2979431,
+      "sha256": "9905ead83ac16ae4a2915cb44ab1edb9c53eb3ac5a77a71f2a2e3ba18d59efb4"
+    },
+    {
+      "both_null_rows": 117814,
+      "bytes": 55682369,
+      "file": "yellow_tripdata_2022-03.parquet",
+      "month": "2022-03",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 117814,
+        "passenger_count": 117814
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3627882,
+      "sha256": "b8b63566178c65da758cc292338ebc308534eb57607085fc67b2c939ae6035e3"
+    },
+    {
+      "both_null_rows": 118874,
+      "bytes": 55222692,
+      "file": "yellow_tripdata_2022-04.parquet",
+      "month": "2022-04",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 118874,
+        "passenger_count": 118874
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3599920,
+      "sha256": "8c4162f28244098bd40f150f5f639cc1f41673e0f0df47e6399d7d374c224049"
+    },
+    {
+      "both_null_rows": 129524,
+      "bytes": 55558821,
+      "file": "yellow_tripdata_2022-05.parquet",
+      "month": "2022-05",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 129524,
+        "passenger_count": 129524
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3588295,
+      "sha256": "6946b56ee057b72dced2204e0c10f2be2e1b7358c5b2c2943f88d2310089c43c"
+    },
+    {
+      "both_null_rows": 132448,
+      "bytes": 55365184,
+      "file": "yellow_tripdata_2022-06.parquet",
+      "month": "2022-06",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 132448,
+        "passenger_count": 132448
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3558124,
+      "sha256": "a08f27ea544a500a6e10637605e5906e246e2836435ba1c05a3a3521faf42389"
+    },
+    {
+      "both_null_rows": 105194,
+      "bytes": 49367712,
+      "file": "yellow_tripdata_2022-07.parquet",
+      "month": "2022-07",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 105194,
+        "passenger_count": 105194
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3174394,
+      "sha256": "5aa3c2a9deb55f09527e76e6f94a8185a4a04cd6361c8082ff6d6e64ab817d5b"
+    },
+    {
+      "both_null_rows": 93174,
+      "bytes": 49717159,
+      "file": "yellow_tripdata_2022-08.parquet",
+      "month": "2022-08",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 93174,
+        "passenger_count": 93174
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3152677,
+      "sha256": "7c2d8f6ad71d3b0e432a77553224ea69f473d0b8bdff24a5b11d289ac5388536"
+    },
+    {
+      "both_null_rows": 116592,
+      "bytes": 49619957,
+      "file": "yellow_tripdata_2022-09.parquet",
+      "month": "2022-09",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 116592,
+        "passenger_count": 116592
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3183767,
+      "sha256": "1ce6af91b4eb1583d3e710fec414c0aedddec96517b309506e7d12c3de72bb02"
+    },
+    {
+      "both_null_rows": 133021,
+      "bytes": 57061938,
+      "file": "yellow_tripdata_2022-10.parquet",
+      "month": "2022-10",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 133021,
+        "passenger_count": 133021
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3675411,
+      "sha256": "3f3cab00e7d236735d3ab227e54ffe48fd28b0afbb30ae90d843d7a065a3ae69"
+    },
+    {
+      "both_null_rows": 121958,
+      "bytes": 50106631,
+      "file": "yellow_tripdata_2022-11.parquet",
+      "month": "2022-11",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 121958,
+        "passenger_count": 121958
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3252717,
+      "sha256": "bf9fc6cd403320f2d00c2672fe1d4d58594c56ed7f64ab9bc7021d4c12bb543c"
+    },
+    {
+      "both_null_rows": 126463,
+      "bytes": 53640739,
+      "file": "yellow_tripdata_2022-12.parquet",
+      "month": "2022-12",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 126463,
+        "passenger_count": 126463
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3399549,
+      "sha256": "4a9a69306bd36547b2eed3ecfa7365b53c2872f45b9647834dbd5166dee93708"
+    },
+    {
+      "both_null_rows": 71743,
+      "bytes": 47673370,
+      "file": "yellow_tripdata_2023-01.parquet",
+      "month": "2023-01",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 71743,
+        "passenger_count": 71743
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3066766,
+      "sha256": "32df6f67578fa86c484a6b5ef23a5281992ff085521082340b0f9e5889e9a572"
+    },
+    {
+      "both_null_rows": 76817,
+      "bytes": 47748012,
+      "file": "yellow_tripdata_2023-02.parquet",
+      "month": "2023-02",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 76817,
+        "passenger_count": 76817
+      },
+      "one_sided_null_rows": 0,
+      "rows": 2913955,
+      "sha256": "4809e6aaac64f05a62d16a25d55713be1537ad64fc261e895eaf2d2120fe750a"
+    },
+    {
+      "both_null_rows": 87619,
+      "bytes": 56127762,
+      "file": "yellow_tripdata_2023-03.parquet",
+      "month": "2023-03",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 87619,
+        "passenger_count": 87619
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3403766,
+      "sha256": "e7d44943111b007bf0e7084863511886e0db29f862f9a96239383a1f86c6c26e"
+    },
+    {
+      "both_null_rows": 90690,
+      "bytes": 54222699,
+      "file": "yellow_tripdata_2023-04.parquet",
+      "month": "2023-04",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 90690,
+        "passenger_count": 90690
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3288250,
+      "sha256": "95c01c53c865e06489179bdecce3a59603697a1557c4d5d183c20ae13a144dc6"
+    },
+    {
+      "both_null_rows": 101796,
+      "bytes": 58654627,
+      "file": "yellow_tripdata_2023-05.parquet",
+      "month": "2023-05",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 101796,
+        "passenger_count": 101796
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3513649,
+      "sha256": "9bd7d1c557bb9d0413619ba296b4828b884852a70bd07f2230b83f080d9a8591"
+    },
+    {
+      "both_null_rows": 99887,
+      "bytes": 54999465,
+      "file": "yellow_tripdata_2023-06.parquet",
+      "month": "2023-06",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 99887,
+        "passenger_count": 99887
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3307234,
+      "sha256": "3e60e29b5df45683948b68acbfb503aa459d14162c610622585c6580fdbfc73a"
+    },
+    {
+      "both_null_rows": 85086,
+      "bytes": 48361828,
+      "file": "yellow_tripdata_2023-07.parquet",
+      "month": "2023-07",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 85086,
+        "passenger_count": 85086
+      },
+      "one_sided_null_rows": 0,
+      "rows": 2907108,
+      "sha256": "98504ae351d920e9e0b61241f5707f90ee1588cfb199c378459234b5035805ab"
+    },
+    {
+      "both_null_rows": 87886,
+      "bytes": 48152353,
+      "file": "yellow_tripdata_2023-08.parquet",
+      "month": "2023-08",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 87886,
+        "passenger_count": 87886
+      },
+      "one_sided_null_rows": 0,
+      "rows": 2824209,
+      "sha256": "84ce36a2f84fa14c12fd976c79a7d4f30c871f1782b08ca7c27bb76ab946e66b"
+    },
+    {
+      "both_null_rows": 140225,
+      "bytes": 47895515,
+      "file": "yellow_tripdata_2023-09.parquet",
+      "month": "2023-09",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 140225,
+        "passenger_count": 140225
+      },
+      "one_sided_null_rows": 0,
+      "rows": 2846722,
+      "sha256": "091bf156bea5bb10bd217f5f12375f966f8789349af45d5ee4153e3e1e077a87"
+    },
+    {
+      "both_null_rows": 154929,
+      "bytes": 59009059,
+      "file": "yellow_tripdata_2023-10.parquet",
+      "month": "2023-10",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 154929,
+        "passenger_count": 154929
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3522285,
+      "sha256": "dc5f069476d350df802ed8120f3b39ec321c34cfa905381e87f608c78ca0c645"
+    },
+    {
+      "both_null_rows": 132675,
+      "bytes": 56094653,
+      "file": "yellow_tripdata_2023-11.parquet",
+      "month": "2023-11",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 132675,
+        "passenger_count": 132675
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3339715,
+      "sha256": "af203de0e73a92d640121f02a34326f25037d62380fc406237c87c2a4231ae58"
+    },
+    {
+      "both_null_rows": 180003,
+      "bytes": 56804275,
+      "file": "yellow_tripdata_2023-12.parquet",
+      "month": "2023-12",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 180003,
+        "passenger_count": 180003
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3376567,
+      "sha256": "ab4f4db11cb31484747f62eb507c13fcfaff290aaf59c13e6465dea0b1166b9c"
+    },
+    {
+      "both_null_rows": 140162,
+      "bytes": 49961641,
+      "file": "yellow_tripdata_2024-01.parquet",
+      "month": "2024-01",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 140162,
+        "passenger_count": 140162
+      },
+      "one_sided_null_rows": 0,
+      "rows": 2964624,
+      "sha256": "c4d59da7bbc8abaeeeb1727947ee93d9891a71acb42854bd80db1571b2030510"
+    },
+    {
+      "both_null_rows": 185610,
+      "bytes": 50349284,
+      "file": "yellow_tripdata_2024-02.parquet",
+      "month": "2024-02",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 185610,
+        "passenger_count": 185610
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3007526,
+      "sha256": "c76c43c18c6c6664080dd920baab4928988d5786a6b65980792ca7cd796f9f20"
+    },
+    {
+      "both_null_rows": 426190,
+      "bytes": 60078280,
+      "file": "yellow_tripdata_2024-03.parquet",
+      "month": "2024-03",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 426190,
+        "passenger_count": 426190
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3582628,
+      "sha256": "2d4cdc8fb96726cdd3803b13b02d2e61e71d45720aff0ebc693a8bdd1f249823"
+    },
+    {
+      "both_null_rows": 408576,
+      "bytes": 59133625,
+      "file": "yellow_tripdata_2024-04.parquet",
+      "month": "2024-04",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 408576,
+        "passenger_count": 408576
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3514289,
+      "sha256": "ce37f736c7cf9e92164c850ef2b502a8f7bb590fc1804b6edbcb80293da01b89"
+    },
+    {
+      "both_null_rows": 404666,
+      "bytes": 62553128,
+      "file": "yellow_tripdata_2024-05.parquet",
+      "month": "2024-05",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 404666,
+        "passenger_count": 404666
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3723833,
+      "sha256": "1974230be2b5a3ea92e47b5eb77f32dbf1de896d81ad8df4ab6faba52749ad23"
+    },
+    {
+      "both_null_rows": 410781,
+      "bytes": 59859922,
+      "file": "yellow_tripdata_2024-06.parquet",
+      "month": "2024-06",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 410781,
+        "passenger_count": 410781
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3539193,
+      "sha256": "677cf14c8347f745b583f012fbdba072334c6c4efa17bfd6a64369f2ba30329c"
+    },
+    {
+      "both_null_rows": 278989,
+      "bytes": 52299432,
+      "file": "yellow_tripdata_2024-07.parquet",
+      "month": "2024-07",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 278989,
+        "passenger_count": 278989
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3076903,
+      "sha256": "af12d6b04daeb78550799ae99933d495b27d715b6dbb0fad9bb750a4537d3070"
+    },
+    {
+      "both_null_rows": 258667,
+      "bytes": 51067350,
+      "file": "yellow_tripdata_2024-08.parquet",
+      "month": "2024-08",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 258667,
+        "passenger_count": 258667
+      },
+      "one_sided_null_rows": 0,
+      "rows": 2979183,
+      "sha256": "7315643dd16bafc03e27d9903edbfd35404c2550a695d0da0a3e73852d940cfb"
+    },
+    {
+      "both_null_rows": 483731,
+      "bytes": 61170186,
+      "file": "yellow_tripdata_2024-09.parquet",
+      "month": "2024-09",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 483731,
+        "passenger_count": 483731
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3633030,
+      "sha256": "2f42e4a383a6635de803001462848d0aee2b47f6ce899126805d2d05361fb843"
+    },
+    {
+      "both_null_rows": 393895,
+      "bytes": 64346071,
+      "file": "yellow_tripdata_2024-10.parquet",
+      "month": "2024-10",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 393895,
+        "passenger_count": 393895
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3833771,
+      "sha256": "d19fe05aa0b259af24eb47051735293287f1e6dc263ba04030ec1ab4c6ec2650"
+    },
+    {
+      "both_null_rows": 373674,
+      "bytes": 60658709,
+      "file": "yellow_tripdata_2024-11.parquet",
+      "month": "2024-11",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 373674,
+        "passenger_count": 373674
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3646369,
+      "sha256": "5ef321876de5007a7c147a347389133fc94fd7ac28f82eb1d57d8f2cf05cfd3b"
+    },
+    {
+      "both_null_rows": 326291,
+      "bytes": 61524085,
+      "file": "yellow_tripdata_2024-12.parquet",
+      "month": "2024-12",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 326291,
+        "passenger_count": 326291
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3668371,
+      "sha256": "41ebf7db80bebde60c58e5143c14cdf38ad04a0f3e3ff44215b3e240d55f6c78"
+    },
+    {
+      "both_null_rows": 540149,
+      "bytes": 59158238,
+      "file": "yellow_tripdata_2025-01.parquet",
+      "month": "2025-01",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 540149,
+        "passenger_count": 540149
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3475226,
+      "sha256": "9af277e4c0d3f9deb30644da822981e1e7df6af58313170fd3aa8a474485488a"
+    },
+    {
+      "both_null_rows": 806937,
+      "bytes": 60343086,
+      "file": "yellow_tripdata_2025-02.parquet",
+      "month": "2025-02",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 806937,
+        "passenger_count": 806937
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3577543,
+      "sha256": "037cba555a73663f3a51a2c27816e40e3feb364769942bdf122b9da31e377bd3"
+    },
+    {
+      "both_null_rows": 916663,
+      "bytes": 69964745,
+      "file": "yellow_tripdata_2025-03.parquet",
+      "month": "2025-03",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 916663,
+        "passenger_count": 916663
+      },
+      "one_sided_null_rows": 0,
+      "rows": 4145257,
+      "sha256": "20c4b77cce457b7cfdae77c5069ca7dc91c167f876a41467f4502ab69487a186"
+    },
+    {
+      "both_null_rows": 745730,
+      "bytes": 67352824,
+      "file": "yellow_tripdata_2025-04.parquet",
+      "month": "2025-04",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 745730,
+        "passenger_count": 745730
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3970553,
+      "sha256": "6f98938de9380a3f85600533816f0dc0e6d9b5b210e485d623952bac599bbe28"
+    },
+    {
+      "both_null_rows": 1196176,
+      "bytes": 77837865,
+      "file": "yellow_tripdata_2025-05.parquet",
+      "month": "2025-05",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 1196176,
+        "passenger_count": 1196176
+      },
+      "one_sided_null_rows": 0,
+      "rows": 4591845,
+      "sha256": "7ef46bcd0fceee7f8c0bb38a532be05bceefabb512d4bb0b32a7727dd862b15c"
+    },
+    {
+      "both_null_rows": 1212946,
+      "bytes": 73542954,
+      "file": "yellow_tripdata_2025-06.parquet",
+      "month": "2025-06",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 1212946,
+        "passenger_count": 1212946
+      },
+      "one_sided_null_rows": 0,
+      "rows": 4322960,
+      "sha256": "1bea7f5b09c744414451fa7fef09fbc5a393ffb1621c859be6ba0df23a14e1b6"
+    },
+    {
+      "both_null_rows": 1038755,
+      "bytes": 66943728,
+      "file": "yellow_tripdata_2025-07.parquet",
+      "month": "2025-07",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 1038755,
+        "passenger_count": 1038755
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3898963,
+      "sha256": "1efa6a0458dc60341f7f81dcbb5015af731f42d1a109f4e0d594dd46970fd4ef"
+    },
+    {
+      "both_null_rows": 886234,
+      "bytes": 62293743,
+      "file": "yellow_tripdata_2025-08.parquet",
+      "month": "2025-08",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 886234,
+        "passenger_count": 886234
+      },
+      "one_sided_null_rows": 0,
+      "rows": 3574091,
+      "sha256": "b982ace703e3564d92e94edae5ec93515f4f1fb07a5b95e7404c32464c1a6a89"
+    },
+    {
+      "both_null_rows": 1067195,
+      "bytes": 72432945,
+      "file": "yellow_tripdata_2025-09.parquet",
+      "month": "2025-09",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 1067195,
+        "passenger_count": 1067195
+      },
+      "one_sided_null_rows": 0,
+      "rows": 4251015,
+      "sha256": "cd39b9901f01d1fd752d45cbaec91ee5f68c4dddf9e261e938c1dbab404644c7"
+    },
+    {
+      "both_null_rows": 990887,
+      "bytes": 75267589,
+      "file": "yellow_tripdata_2025-10.parquet",
+      "month": "2025-10",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 990887,
+        "passenger_count": 990887
+      },
+      "one_sided_null_rows": 0,
+      "rows": 4428699,
+      "sha256": "e1f63caf331bc6230d9c6f757cb88e55fdc2bddde185fb414d2c947abdc773c3"
+    },
+    {
+      "both_null_rows": 1014740,
+      "bytes": 71134255,
+      "file": "yellow_tripdata_2025-11.parquet",
+      "month": "2025-11",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 1014740,
+        "passenger_count": 1014740
+      },
+      "one_sided_null_rows": 0,
+      "rows": 4181444,
+      "sha256": "2cf2f3127f96d4d5dea30f8afe05119cf8e4ba57bd9e60b789d3f296fc8459ab"
+    },
+    {
+      "both_null_rows": 1195482,
+      "bytes": 73701327,
+      "file": "yellow_tripdata_2025-12.parquet",
+      "month": "2025-12",
+      "nan_rows": {
+        "RatecodeID": 0,
+        "passenger_count": 0
+      },
+      "nulls": {
+        "RatecodeID": 1195482,
+        "passenger_count": 1195482
+      },
+      "one_sided_null_rows": 0,
+      "rows": 4305006,
+      "sha256": "eaba7ff61ebb6453fc6f673fda43d621380307f869b768b124992e8486c785e1"
+    }
+  ],
+  "range": {
+    "end": "2025-12",
+    "months": 48,
+    "start": "2022-01"
+  },
+  "tool": {
+    "duckdb": "1.2.2",
+    "python": "3.10.11"
+  }
+}
