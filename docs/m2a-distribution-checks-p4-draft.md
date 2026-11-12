@@ -19,15 +19,17 @@ These features are candidates because they are interpretable and map to distinct
 
 For each eligible month, convert bin counts to proportions. For weekday-by-hour, use an `other_or_low_support` bin for cells with fewer than 30 observations in the preceding baseline. Keep the raw counts and the resulting eligibility mask in the calibration record. Do not discard rows from exact reconciliation.
 
-For a score month, construct the reference profile from the component-wise median of the 12 preceding eligible monthly proportion vectors from the same contract, schema cohort and operating regime, then renormalize the vector to sum to one. This gives each month equal weight and limits the influence of an unusually large month or one extreme historical month. No calendar-month-of-year strata are used.
+Smooth each monthly count vector `c` with the same fixed bin set using `p[i] = (c[i] + 0.5) / (sum(c) + 0.5 * K)`, where `K` is the number of declared bins. This yields a probability vector and avoids zero-probability bins.
 
-Use Jensen-Shannon divergence with base-2 logarithms and symmetric Dirichlet smoothing `alpha = 0.5` per declared bin. Report the divergence in bits, bounded from 0 to 1. Record the feature vector, reference vector, eligibility mask and computed distance for every run. This distance measures profile difference; it does not establish why the difference occurred.
+For a score month, fit a Theil-Sen line separately to each bin's smoothed monthly proportion across the 12 preceding eligible months from the same contract, schema cohort and operating regime. Predict each bin one month ahead, clamp negative predictions to zero, and renormalize the predicted vector to sum to one. The median pairwise slope limits the effect of one extreme historical month while allowing gradual linear drift. No calendar-month-of-year strata are used. If all predicted mass is zero or non-finite, mark the feature ineligible and report why.
+
+Compare the observed and predicted profile with Jensen-Shannon divergence using base-2 logarithms: `JS(p,q) = 0.5 * KL(p||m) + 0.5 * KL(q||m)`, where `m = (p + q) / 2`. Report divergence in bits, bounded from 0 to 1. Record the observed vector, predicted vector, eligibility mask and computed distance for every run. This distance measures profile difference; it does not establish why the difference occurred.
 
 ## Warm-up calibration procedure
 
 After the independent source review determines which 2022 months are eligible calibration controls:
 
-1. For each eligible 2022 month, form a leave-one-month-out reference from the component-wise median of the other eligible 2022 monthly profiles. Apply the same binning, support and smoothing rules as above.
+1. For each eligible 2022 month, fit the same per-bin Theil-Sen trend to the other eligible 2022 monthly profiles, using their actual month indices, and predict the omitted month's profile. This retrospective leave-one-month-out calculation uses no scored-period data. Apply the same binning, support and smoothing rules as above.
 2. Compute both feature distances for every eligible month. Retain the paired distances so threshold selection accounts for checking two features together.
 3. Set one family-wise threshold to the maximum of both feature distances across all eligible 2022 months, plus a fixed numerical tolerance of `1e-12`. A score month alerts if either feature exceeds this frozen threshold. Keep both individual distances in the report.
 4. If fewer than 10 of the 12 months are independently eligible, do not derive or freeze a numeric threshold. Record P4 as unresolved and do not substitute a value selected from later months.
