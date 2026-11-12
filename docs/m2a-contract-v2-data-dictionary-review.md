@@ -16,11 +16,34 @@ The NYC TLC Yellow Taxi Trip Records data dictionary dated March 18, 2025 define
 - `payment_type`: payment code. The current dictionary includes 0 for Flex Fare and 1 through 6 for the listed payment outcomes.
 - Fare and surcharge fields describe metered fare, extras, taxes, tips, tolls, improvement surcharge, total amount, NYS congestion surcharge, airport fee, and the CBD congestion fee.
 
-## Comparison with the 48-month schema audit
+## Column-by-column comparison with the audit
 
-The audit shows the same 19 semantic fields in C1 and C2, with physical type changes and the case-only rename `airport_fee` to `Airport_fee`. The March 2025 dictionary describes `airport_fee` as the pickup fee for LaGuardia and JFK. No reviewed source indicates a change in that meaning between C1 and C2.
+The schema audit groups 2022-01 through 2023-01 as C1, 2023-02 through 2024-12 as C2, and 2025 as C3. All 20 distinct semantic columns are compared below. Physical type changes are preserved in per-file provenance. C1 and C2 `airport_fee`/`Airport_fee` differ only by case in the audited schema.
 
-C3 adds `cbd_congestion_fee`. TLC describes it as the per-trip MTA Congestion Relief Zone charge starting January 5, 2025. This is a documented semantic addition, not a rename or type normalization.
+| Column | Dictionary meaning reviewed | Audit presence and physical type | Review result |
+|---|---|---|---|
+| `VendorID` | Technology provider code | C1 BIGINT; C2/C3 INTEGER | Meaning aligns; current code list is not historical proof. |
+| `tpep_pickup_datetime` | Meter engagement time | All cohorts TIMESTAMP | Meaning aligns. |
+| `tpep_dropoff_datetime` | Meter disengagement time | All cohorts TIMESTAMP | Meaning aligns. |
+| `passenger_count` | Passenger count reported for vehicle | C1 DOUBLE; C2/C3 BIGINT | Physical type changes; P1 found integral values in C1. |
+| `trip_distance` | Elapsed miles reported by taximeter | All cohorts DOUBLE | Meaning aligns. |
+| `RatecodeID` | Final rate code | C1 DOUBLE; C2/C3 BIGINT | Physical type changes; current codes are not historical proof. |
+| `store_and_fwd_flag` | Whether held in vehicle memory before provider upload | All cohorts VARCHAR | Meaning aligns; dictionary describes Y/N. |
+| `PULocationID` | TLC taxi zone where meter engaged | C1 BIGINT; C2/C3 INTEGER | Meaning aligns; physical type changes. |
+| `DOLocationID` | TLC taxi zone where meter disengaged | C1 BIGINT; C2/C3 INTEGER | Meaning aligns; physical type changes. |
+| `payment_type` | Payment outcome code | C1 BIGINT; C2/C3 BIGINT | Meaning aligns; current code list is not historical proof. |
+| `fare_amount` | Time-and-distance meter fare | All cohorts DOUBLE | Meaning aligns; dictionary does not establish value correctness. |
+| `extra` | Miscellaneous extras and surcharges | All cohorts DOUBLE | Meaning aligns. |
+| `mta_tax` | Automatically triggered tax based on metered rate | All cohorts DOUBLE | Meaning aligns. |
+| `tip_amount` | Credit-card tip; cash tips are not included | All cohorts DOUBLE | Meaning aligns. |
+| `tolls_amount` | Total tolls paid for the trip | All cohorts DOUBLE | Meaning aligns. |
+| `improvement_surcharge` | Improvement surcharge, begun in 2015 | All cohorts DOUBLE | Meaning aligns. |
+| `total_amount` | Total charged, excluding cash tips | All cohorts DOUBLE | Meaning aligns. |
+| `congestion_surcharge` | NYS congestion surcharge | All cohorts DOUBLE | Meaning aligns; applicability can vary. |
+| `airport_fee` / `Airport_fee` | Pickup fee for LaGuardia and JFK | C1 lowercase; C2/C3 title case; DOUBLE | Case-only schema rename; no reviewed evidence of semantic change. |
+| `cbd_congestion_fee` | Per-trip MTA Congestion Relief Zone fee, effective Jan 5, 2025 | C3 only, DOUBLE | New field; contract applicability begins at the 2025-01 file boundary. |
+
+C3 adds `cbd_congestion_fee`. The decision to start the 2025 regime at the 2025-01 file boundary is an evaluation policy, not a claim that the fee applied from January 1.
 
 The available dictionary is a single current reference. It does not establish that every code list or definition was unchanged in every historical year. In particular, treat the current VendorID and `payment_type` code lists as current descriptions, not evidence that those values were valid in every earlier cohort. Contract v2 should preserve observed values and source schemas, and should not reject historical codes solely because they are absent from the current list without a dated historical reference.
 
