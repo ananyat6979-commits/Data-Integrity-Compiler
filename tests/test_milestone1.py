@@ -210,6 +210,11 @@ def test_contract_hash_is_stable_across_line_endings(sample):
             path.write_bytes(content)
 
 
+def test_committed_v1_contract_hash_is_pinned():
+    root = Path(__file__).parents[1]
+    assert load_contract(root)[2] == "947e696d07ed07482a9d542febf5a345693e5a1a29b4db5875dc0fbdeca3c953"
+
+
 def test_contract_rejects_unsupported_operator_and_missing_setting(sample):
     _, _, root = sample
     contract_file = root / "contracts/pipeline.yaml"
