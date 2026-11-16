@@ -59,10 +59,13 @@ def connect() -> duckdb.DuckDBPyConnection:
     return duckdb.connect(":memory:")
 
 
-def load_contract(root: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
-    contract_dir = root / "contracts"
-    if not contract_dir.is_dir():
-        contract_dir = Path(__file__).parents[2] / "contracts"
+def load_contract(root: Path, version: str = "v1") -> tuple[dict[str, Any], dict[str, Any], str]:
+    if version not in {"v1", "v2"}:
+        raise ValueError(f"Unsupported contract version: {version}")
+    contracts_root = root / "contracts"
+    if not contracts_root.is_dir():
+        contracts_root = Path(__file__).parents[2] / "contracts"
+    contract_dir = contracts_root if version == "v1" else contracts_root / version
     yaml_path = contract_dir / "pipeline.yaml"
     if not yaml_path.is_file():
         raise ValueError(f"Missing required pipeline contract: {yaml_path}")
@@ -83,6 +86,77 @@ def load_contract(root: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
         raise ValueError("Referenced schema required_columns must be declared in columns")
     if not isinstance(schema.get("compatible_additions"), list) or not isinstance(schema.get("schema_contract"), str):
         raise ValueError("Referenced schema must define schema_contract and compatible_additions")
+    if version == "v2":
+        audit_ref = contract.get("source_audit")
+        required_audit_fields = {"path", "sha256", "audit_version", "months"}
+        if not isinstance(audit_ref, dict) or not required_audit_fields <= audit_ref.keys():
+            raise ValueError("Contract v2 source_audit settings are incomplete")
+        audit_path = (root / str(audit_ref["path"])).resolve()
+        repository_root = root.resolve()
+        if repository_root not in audit_path.parents or not audit_path.is_file():
+            raise ValueError("Contract v2 source_audit.path must reference an existing file inside the repository")
+        observed_audit_hash = sha256(audit_path)
+        if observed_audit_hash != audit_ref["sha256"]:
+            raise ValueError("Contract v2 source audit SHA-256 does not match the pinned digest")
+        audit = json.loads(audit_path.read_text(encoding="utf-8"))
+        if audit.get("audit_version") != audit_ref["audit_version"]:
+            raise ValueError("Contract v2 source audit version does not match the pinned version")
+        audit_months = audit.get("months")
+        expected_months = audit_ref["months"]
+        if not isinstance(audit_months, list) or not isinstance(expected_months, list):
+            raise ValueError("Contract v2 source audit must declare month records and expected months")
+        observed_months = [item.get("month") for item in audit_months if isinstance(item, dict)]
+        if observed_months != expected_months or len(set(observed_months)) != len(expected_months):
+            raise ValueError("Contract v2 source audit month inventory is incomplete, duplicated, or out of order")
+        cohorts = audit.get("cohorts")
+        if not isinstance(cohorts, list) or not cohorts:
+            raise ValueError("Contract v2 source audit must define schema cohorts")
+        cohort_by_id = {item.get("cohort_id"): item for item in cohorts if isinstance(item, dict)}
+        cohort_months = [month for item in cohorts for month in item.get("months", [])]
+        if (len(cohort_by_id) != len(cohorts) or sorted(cohort_months) != sorted(expected_months)
+                or len(cohort_months) != len(set(cohort_months))):
+            raise ValueError("Contract v2 audit cohorts must cover each expected month exactly once")
+        for cohort in cohorts:
+            signature = hashlib.sha256(json.dumps(
+                cohort["columns"], sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            if signature != cohort.get("signature") or len(cohort["columns"]) != cohort.get("column_count"):
+                raise ValueError(f"Contract v2 audit cohort {cohort.get('cohort_id')} has invalid schema evidence")
+        for record in audit_months:
+            cohort = cohort_by_id.get(record.get("cohort_id"))
+            if (cohort is None or record["month"] not in cohort["months"]
+                    or record.get("schema_signature") != cohort["signature"]
+                    or record.get("file") != f"yellow_tripdata_{record['month']}.parquet"
+                    or not isinstance(record.get("sha256"), str) or len(record["sha256"]) != 64):
+                raise ValueError(f"Contract v2 audit record is inconsistent for {record.get('month')}")
+        normalization = contract.get("normalization")
+        if not isinstance(normalization, dict) or not {"column_name_case", "column_aliases", "source_type_map"} <= normalization.keys():
+            raise ValueError("Contract v2 normalization settings are incomplete")
+        if normalization["column_name_case"] != "case_insensitive":
+            raise ValueError("Contract v2 column_name_case must be case_insensitive")
+        aliases = normalization["column_aliases"]
+        type_map = normalization["source_type_map"]
+        if not isinstance(aliases, dict) or not isinstance(type_map, dict):
+            raise ValueError("Contract v2 normalization aliases and source_type_map must be mappings")
+        canonical_by_fold = {name.casefold(): name for name in schema["columns"]}
+        for cohort in audit.get("cohorts", []):
+            mapped_names = []
+            for item in cohort.get("columns", []):
+                source_name = item["name"]
+                canonical_name = aliases.get(source_name, canonical_by_fold.get(source_name.casefold()))
+                if canonical_name not in schema["columns"]:
+                    raise ValueError(f"Contract v2 does not map source column {source_name} in {cohort.get('cohort_id')}")
+                mapped_names.append(canonical_name)
+                allowed_source_types = type_map.get(canonical_name)
+                if not isinstance(allowed_source_types, list) or item["type"] not in allowed_source_types:
+                    raise ValueError(f"Contract v2 has no physical type mapping for {source_name} ({item['type']})")
+            if len(mapped_names) != len(set(mapped_names)):
+                raise ValueError(f"Contract v2 normalization merges source columns in {cohort.get('cohort_id')}")
+            if not set(schema["required_columns"]) <= set(mapped_names):
+                raise ValueError(f"Contract v2 source cohort {cohort.get('cohort_id')} lacks required semantic columns")
+            if len(cohort.get("columns", [])) != cohort.get("column_count"):
+                raise ValueError(f"Contract v2 source cohort {cohort.get('cohort_id')} has an invalid column count")
+        if set(type_map) != set(schema["columns"]):
+            raise ValueError("Contract v2 source_type_map must declare every semantic schema column")
     schema_policy_fields = {"added_optional_columns", "unrecognized_added_columns", "removed_optional_columns", "missing_required_columns"}
     policy = contract["schema_policy"]
     if not isinstance(policy, dict) or not schema_policy_fields <= policy.keys():
@@ -130,10 +204,74 @@ def load_contract(root: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
         raise ValueError("join.unmatched_policy must be exclude or block")
     if not isinstance(join["key_non_null"], bool):
         raise ValueError("join.key_non_null must be a boolean")
+    if version == "v2":
+        coverage = contract.get("date_coverage")
+        if not isinstance(coverage, dict) or not {"rule_id", "lower_offset_days", "upper_offset_days", "upper_bound"} <= coverage.keys():
+            raise ValueError("Contract v2 date_coverage settings are incomplete")
+        if (coverage["rule_id"] != "far_out_pickup" or coverage["lower_offset_days"] != -1
+                or coverage["upper_offset_days"] != 1 or coverage["upper_bound"] != "exclusive"
+                or coverage.get("handling") != "reject_row_and_count_without_alert"):
+            raise ValueError("Contract v2 date_coverage must use the declared one-day half-open window")
+        evaluation = contract.get("evaluation")
+        if not isinstance(evaluation, dict) or not {"exact_month_range", "distribution_month_range", "regime_boundary_month"} <= evaluation.keys():
+            raise ValueError("Contract v2 evaluation settings are incomplete")
+        if (evaluation["exact_month_range"] != ["2023-01", "2025-12"]
+                or evaluation["distribution_month_range"] != ["2023-01", "2024-12"]
+                or evaluation["regime_boundary_month"] != "2025-01"):
+            raise ValueError("Contract v2 evaluation ranges must preserve the declared 36 and 24 month denominators")
     hash_payload = {"pipeline.yaml": _contract_file_sha256(yaml_path),
                     "schema": _contract_file_sha256(schema_path)}
     contract_hash = hashlib.sha256(json.dumps(hash_payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return contract, schema, contract_hash
+
+
+def build_v2_source_provenance(root: Path, source_path: Path, month: str,
+                               observed_columns: list[dict[str, str]], row_count: int) -> dict[str, Any]:
+    """Validate an actual source file against the pinned M2a audit and return portable provenance."""
+    contract, schema, _ = load_contract(root, version="v2")
+    source_audit = contract["source_audit"]
+    audit_path = root / source_audit["path"]
+    audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    record = next((item for item in audit["months"] if item["month"] == month), None)
+    if record is None:
+        raise ValueError(f"Source month {month} is not included in the pinned M2a audit")
+    path = source_path.resolve()
+    if path.name != record["file"] or not path.is_file():
+        raise ValueError(f"Source path must identify the audited file {record['file']}")
+    observed_signature = hashlib.sha256(json.dumps(
+        observed_columns, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    expected_cohort = next(item for item in audit["cohorts"] if item["cohort_id"] == record["cohort_id"])
+    if (sha256(path) != record["sha256"] or path.stat().st_size != record["bytes"]
+            or row_count != record["rows"] or observed_signature != record["schema_signature"]
+            or observed_columns != expected_cohort["columns"]):
+        raise ValueError(f"Source bytes, row count, or physical schema differ from the pinned audit for {month}")
+    normalization = contract["normalization"]
+    aliases = normalization["column_aliases"]
+    canonical_by_fold = {name.casefold(): name for name in schema["columns"]}
+    mappings = []
+    normalized_columns = []
+    for item in observed_columns:
+        canonical_name = aliases.get(item["name"], canonical_by_fold.get(item["name"].casefold()))
+        if canonical_name is None:
+            raise ValueError(f"No semantic column mapping exists for {item['name']}")
+        mappings.append({"source_name": item["name"], "source_type": item["type"],
+                         "semantic_name": canonical_name, "semantic_type": schema["columns"][canonical_name]})
+        normalized_columns.append({"name": canonical_name, "type": schema["columns"][canonical_name]})
+    return {
+        "contract_version": 2,
+        "source_month": month,
+        "logical_source_name": record["file"],
+        "source_sha256": record["sha256"],
+        "source_bytes": record["bytes"],
+        "source_rows": record["rows"],
+        "audit": {"version": source_audit["audit_version"], "path": source_audit["path"],
+                  "sha256": source_audit["sha256"], "cohort_id": record["cohort_id"],
+                  "schema_signature": record["schema_signature"]},
+        "original_columns": observed_columns,
+        "semantic_schema_id": schema["schema_contract"],
+        "normalized_columns": normalized_columns,
+        "column_mapping": mappings,
+    }
 
 
 def _quote_identifier(identifier: str) -> str:
