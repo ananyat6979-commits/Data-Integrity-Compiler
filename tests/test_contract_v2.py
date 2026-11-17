@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -171,24 +172,44 @@ def test_v2_source_provenance_rejects_mismatched_row_count(
         )
 
 
-def test_v2_subprocess_run_rejects_far_out_rows_without_blocking(tmp_path: Path):
+@pytest.mark.parametrize(
+    ("month", "cohort_id"),
+    [("2023-01", "C1"), ("2024-01", "C2"), ("2025-01", "C3")],
+)
+def test_v2_subprocess_run_rejects_far_out_rows_without_blocking(
+    tmp_path: Path, month: str, cohort_id: str
+):
     shutil.copytree(ROOT / "contracts", tmp_path / "contracts")
     audit = tmp_path / "experiments/m2a/audit"
     audit.mkdir(parents=True)
     shutil.copy2(ROOT / "experiments/m2a/audit/schema_audit_2022-01_2025-12.json", audit)
-    trips = tmp_path / "yellow_tripdata_2023-01.parquet"
+    trips = tmp_path / f"yellow_tripdata_{month}.parquet"
     audit_path = audit / "schema_audit_2022-01_2025-12.json"
     audit_doc = json.loads(audit_path.read_text(encoding="utf-8"))
-    audit_record = next(item for item in audit_doc["months"] if item["month"] == "2023-01")
-    cohort = next(item for item in audit_doc["cohorts"] if item["cohort_id"] == audit_record["cohort_id"])
+    audit_record = next(item for item in audit_doc["months"] if item["month"] == month)
+    assert audit_record["cohort_id"] == cohort_id
+    cohort = next(item for item in audit_doc["cohorts"] if item["cohort_id"] == cohort_id)
+    month_start = datetime.strptime(month + "-01", "%Y-%m-%d")
+    lower = month_start - timedelta(days=1)
+    if month_start.month == 12:
+        next_month = month_start.replace(year=month_start.year + 1, month=1)
+    else:
+        next_month = month_start.replace(month=month_start.month + 1)
+    upper = next_month + timedelta(days=1)
+    pickup_times = [lower + timedelta(days=1) - timedelta(minutes=1), month_start,
+                    upper - timedelta(minutes=1), upper]
     fixture_rows = [
-        {"tpep_pickup_datetime": "2022-12-31 23:59:00", "tpep_dropoff_datetime": "2023-01-01 00:10:00",
+        {"tpep_pickup_datetime": pickup_times[0].strftime("%Y-%m-%d %H:%M:%S"),
+         "tpep_dropoff_datetime": (pickup_times[0] + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S"),
          "PULocationID": 1, "DOLocationID": 2, "fare_amount": 10.0, "trip_distance": 2.0},
-        {"tpep_pickup_datetime": "2023-01-31 23:59:00", "tpep_dropoff_datetime": "2023-02-01 00:10:00",
+        {"tpep_pickup_datetime": pickup_times[1].strftime("%Y-%m-%d %H:%M:%S"),
+         "tpep_dropoff_datetime": (pickup_times[1] + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S"),
          "PULocationID": 1, "DOLocationID": 2, "fare_amount": 20.0, "trip_distance": 3.0},
-        {"tpep_pickup_datetime": "2023-02-01 23:59:00", "tpep_dropoff_datetime": "2023-02-02 00:10:00",
+        {"tpep_pickup_datetime": pickup_times[2].strftime("%Y-%m-%d %H:%M:%S"),
+         "tpep_dropoff_datetime": (pickup_times[2] + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S"),
          "PULocationID": 2, "DOLocationID": 1, "fare_amount": 5.0, "trip_distance": 1.0},
-        {"tpep_pickup_datetime": "2023-02-02 00:00:00", "tpep_dropoff_datetime": "2023-02-02 00:15:00",
+        {"tpep_pickup_datetime": pickup_times[3].strftime("%Y-%m-%d %H:%M:%S"),
+         "tpep_dropoff_datetime": (pickup_times[3] + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S"),
          "PULocationID": 2, "DOLocationID": 1, "fare_amount": 8.0, "trip_distance": 1.0},
     ]
     overrides = {
@@ -237,9 +258,9 @@ def test_v2_subprocess_run_rejects_far_out_rows_without_blocking(tmp_path: Path)
     report = run(trips, lookup, tmp_path, contract_version="v2")
 
     assert report["contract_version"] == 2
-    assert report["source_month"] == "2023-01"
-    assert report["date_coverage"]["lower_bound_inclusive"] == "2022-12-31 00:00:00"
-    assert report["date_coverage"]["upper_bound_exclusive"] == "2023-02-02 00:00:00"
+    assert report["source_month"] == month
+    assert report["date_coverage"]["lower_bound_inclusive"] == lower.isoformat(sep=" ")
+    assert report["date_coverage"]["upper_bound_exclusive"] == upper.isoformat(sep=" ")
     assert report["date_coverage"]["rejected_rows"] == 1
     assert report["date_coverage"]["alerts"] == 0
     assert report["cleaning"]["rejected_rows_by_rule"]["far_out_pickup"] == 1
@@ -250,3 +271,4 @@ def test_v2_subprocess_run_rejects_far_out_rows_without_blocking(tmp_path: Path)
     assert report["publication"]["decision"] == "published"
     assert report["peak_memory"]["scope"] == "dedicated_experiment_process"
     assert report["source_provenance"]["source_rows"] == 4
+    assert report["source_provenance"]["audit"]["cohort_id"] == cohort_id
