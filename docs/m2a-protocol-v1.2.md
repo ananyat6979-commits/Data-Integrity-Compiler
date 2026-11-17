@@ -9,6 +9,7 @@ The 2022-only leave-one-month-out procedure in v1.1 is interpolation, while the 
 ## Current evaluation scope and denominators
 
 - Distribution checks are disabled. No feature distances or thresholds are fitted for evaluation, and no scored distribution-alert months exist. The distribution denominator is zero.
+- This amendment overrides v1.1's instruction to score 24 distribution months and its use of 2022 as a distribution-calibration period. The 24 months remain only the maximum potential future score range.
 - The 2022 files are source-review and warm-up material only. They are not a calibration set and cannot be called independently verified clean merely because they have a computed profile.
 - Exact reconciliation covers 36 monthly controls from 2023-01 through 2025-12. This denominator is separate from the 24-month maximum potential future distribution range of 2023-01 through 2024-12. Do not call those 24 months scored distribution controls under v1.2.
 - Exact reconciliation, independent reference calculations, fault hooks, development cases, detector comparisons, and fault injection proceed without P4 distribution alerts. Their acceptance criteria remain those in v1.1.
