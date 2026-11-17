@@ -41,6 +41,12 @@ def _contract_file_sha256(path: Path) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def _normalized_json_sha256(path: Path) -> str:
+    """Hash UTF-8 JSON after newline normalization for a platform-stable audit pin."""
+    content = path.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
 def canonical_hash(rows: list[tuple[Any, ...]]) -> str:
     def norm(v: Any) -> Any:
         if v is None:
@@ -88,14 +94,16 @@ def load_contract(root: Path, version: str = "v1") -> tuple[dict[str, Any], dict
         raise ValueError("Referenced schema must define schema_contract and compatible_additions")
     if version == "v2":
         audit_ref = contract.get("source_audit")
-        required_audit_fields = {"path", "sha256", "audit_version", "months"}
+        required_audit_fields = {"path", "sha256", "sha256_method", "audit_version", "months"}
         if not isinstance(audit_ref, dict) or not required_audit_fields <= audit_ref.keys():
             raise ValueError("Contract v2 source_audit settings are incomplete")
+        if audit_ref["sha256_method"] != "utf8_lf_normalized":
+            raise ValueError("Contract v2 source_audit.sha256_method is unsupported")
         audit_path = (root / str(audit_ref["path"])).resolve()
         repository_root = root.resolve()
         if repository_root not in audit_path.parents or not audit_path.is_file():
             raise ValueError("Contract v2 source_audit.path must reference an existing file inside the repository")
-        observed_audit_hash = sha256(audit_path)
+        observed_audit_hash = _normalized_json_sha256(audit_path)
         if observed_audit_hash != audit_ref["sha256"]:
             raise ValueError("Contract v2 source audit SHA-256 does not match the pinned digest")
         audit = json.loads(audit_path.read_text(encoding="utf-8"))

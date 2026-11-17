@@ -59,6 +59,28 @@ def test_v2_contract_rejects_a_missing_or_modified_pinned_audit(v2_root: Path):
         load_contract(v2_root, version="v2")
 
 
+def test_v2_audit_pin_is_stable_across_line_endings(v2_root: Path):
+    audit_path = v2_root / "experiments/m2a/audit/schema_audit_2022-01_2025-12.json"
+    original = audit_path.read_bytes()
+    lf = original.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    audit_path.write_bytes(lf)
+    _, _, lf_contract_hash = load_contract(v2_root, version="v2")
+    audit_path.write_bytes(lf.replace(b"\n", b"\r\n"))
+    _, _, crlf_contract_hash = load_contract(v2_root, version="v2")
+    assert crlf_contract_hash == lf_contract_hash
+
+
+def test_v2_audit_hash_method_must_be_explicit_and_supported(v2_root: Path):
+    yaml_path = v2_root / "contracts/v2/pipeline.yaml"
+    original = yaml_path.read_text(encoding="utf-8")
+    yaml_path.write_text(original.replace("sha256_method: utf8_lf_normalized", "sha256_method: raw_bytes"))
+    with pytest.raises(ValueError, match="sha256_method is unsupported"):
+        load_contract(v2_root, version="v2")
+    yaml_path.write_text(original.replace("  sha256_method: utf8_lf_normalized\n", ""))
+    with pytest.raises(ValueError, match="source_audit settings are incomplete"):
+        load_contract(v2_root, version="v2")
+
+
 @pytest.mark.parametrize(
     ("field", "replacement", "error"),
     [
