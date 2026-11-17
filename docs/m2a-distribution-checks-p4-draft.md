@@ -1,50 +1,56 @@
 # M2a Distribution Checks: P4 Draft
 
-**Status:** Proposed Phase 0 methods, not frozen. The current 2022-only calibration procedure is invalid for the planned scoring rule and must not be run to set thresholds. This document does not authorize distribution-detector runs on scored months. Exact checks, reference validation, contract v2 work, and stage hooks may proceed while P4 distribution calibration remains unresolved.
+**Status:** Proposed future method. Under proposed protocol v1.2, distribution alerts are disabled for the current M2a evaluation. This document does not authorize threshold fitting or detector runs. Re-enabling distribution alerts requires a new protocol version and a fresh review.
 
-## Scope and alert semantics
+## Current M2a decision proposal
 
-These checks look for changes in the shape of monthly pickup data that exact reconciliation cannot detect. They are supplementary to exact row, null, fare-sum and join reconciliation. They may emit an alert, but they do not block publication in this version. An alert is not itself evidence of a source anomaly. Apply the D4 source-origin classification and scoring rules separately.
+The current M2a evaluation uses exact reconciliation and fault injection, with 36 exact monthly controls from 2023-01 through 2025-12. It scores zero distribution-alert months because no forecast-aligned calibration set is available. The 24 months from 2023-01 through 2024-12 are only the maximum potential distribution-score range under the present regime boundary, not scored months in protocol v1.2. The 12 months in 2025 remain outside that potential range.
 
-Do not inspect or use 2023-2025 results to choose features, distance functions, smoothing, eligibility rules or thresholds. Preserve source hashes and every calibration input and output hash. Any calibration data must be separate from the final scored months and must be classified under the source-anomaly eligibility rule before profile distances are computed.
+The 2022 files are warm-up and source-review material only. They do not produce calibration scores. Twelve 2022 profiles can provide history for a later forecast, but cannot themselves produce a one-step-ahead forecast score with twelve preceding same-regime profiles. A count of ten eligible 2022 months is therefore not a valid calibration gate.
 
-## Candidate features
+If a later protocol reopens distribution checks, each calibration score must be a one-step-ahead forecast made only from the twelve immediately preceding eligible months in the same contract, schema cohort and regime. The calibration set must contain the pre-registered minimum number of valid forecast scores for every feature. Missing or ineligible months are not skipped to extend history. Calibration and scoring periods must be separated as that protocol specifies. No future protocol may reuse held-out results for tuning.
 
-1. **Pickup weekday-by-hour profile:** 168 bins, using local pickup timestamp weekday and hour. Rows with null or invalid timestamps are handled by exact checks and counted in an explicit invalid category, not silently dropped.
-2. **Pickup-zone profile:** one bin for each zone ID 1 through 265, plus explicit `null_or_out_of_range` and `unmapped` bins. This is calculated from source pickup IDs and, separately, from joined zone labels where the join is under evaluation.
+## Candidate features for a future protocol
 
-These features are candidates because they are interpretable and map to distinct evidence: timestamp allocation and geographic lookup behavior. Do not add fare-per-mile or other features without a written rationale and a separate stability review. The feature list is versioned and hashed before any 2023 or later evaluation.
+1. **Pickup weekday-by-hour profile:** 168 weekday and hour cells, computed from local pickup timestamps.
+2. **Pickup-zone profile:** one cell for each location ID 1 through 265, plus explicit `null_or_out_of_range` and `unmapped` cells. Compute source pickup IDs and joined zone labels separately when evaluating joins.
 
-## Profile construction and distance
+The list is provisional. Do not add features without a written domain rationale and a separate stability review.
 
-For each eligible month, convert bin counts to proportions. For weekday-by-hour, use an `other_or_low_support` bin for cells with fewer than 30 observations in the preceding baseline. Keep the raw counts and the resulting eligibility mask in the calibration record. Do not discard rows from exact reconciliation.
+## Calendar normalization and support
 
-Smooth each monthly count vector `c` with the same fixed bin set using `p[i] = (c[i] + 0.5) / (sum(c) + 0.5 * K)`, where `K` is the number of declared bins. This yields a probability vector and avoids zero-probability bins.
+Raw weekday totals are not comparable across months because a weekday occurs four or five times. For each weekday `w` and hour `h`, compute the per-occurrence rate `r[w,h] = count(w,h) / occurrences(w)`. Build the weekday's 24-hour shape as `p[w,h] = r[w,h] / sum_h(r[w,h])`. This conditions on weekday and removes the 4-versus-5 occurrence composition effect. Preserve occurrence counts and raw counts in evidence.
 
-For a score month, fit a Theil-Sen line separately to each bin's smoothed monthly proportion across the 12 preceding eligible months from the same contract, schema cohort and operating regime. Predict each bin one month ahead, clamp negative predictions to zero, and renormalize the predicted vector to sum to one. The median pairwise slope limits the effect of one extreme historical month while allowing gradual linear drift. No calendar-month-of-year strata are used. If all predicted mass is zero or non-finite, mark the feature ineligible and report why.
+For weekday-hour cells, a baseline count below 30 makes that cell ineligible, following the protocol's cell-level rule. Do not collapse unsupported cells into `other_or_low_support`. Record the eligibility mask and excluded mass. For the zone profile, apply the same 30-observation minimum to each zone using the preceding baseline only. A zone below support is ineligible for that comparison and is not folded into an `other` bin. Keep the full raw zone counts and excluded mass in the record so limited coverage is visible. If no supported cells remain, mark that feature ineligible with a reason.
 
-Compare the observed and predicted profile with Jensen-Shannon divergence using base-2 logarithms: `JS(p,q) = 0.5 * KL(p||m) + 0.5 * KL(q||m)`, where `m = (p + q) / 2`. Report divergence in bits, bounded from 0 to 1. Record the observed vector, predicted vector, eligibility mask and computed distance for every run. This distance measures profile difference; it does not establish why the difference occurred.
+These support rules and the weekday normalization must be frozen before any calibration distances are computed. The future evaluation script must refuse to run unless it receives the reviewed eligibility artifact and verifies its recorded SHA-256. Classifications must predate distance calculation.
 
-## Forecast-aligned calibration and threshold semantics
+## Candidate distance for a future protocol
 
-Every calibration target must be predicted using only its 12 immediately preceding eligible monthly profiles, with the same Theil-Sen fitting, horizon, cohort, regime, binning, support and smoothing rules used for a scored month. This is a rolling-origin forecast. Do not predict an omitted month from other months that occur after it. Leave-one-month-out interpolation is not a valid calibration procedure for this detector.
+Apply the same fixed-bin smoothing to each eligible feature vector: `p[i] = (c[i] + 0.5) / (sum(c) + 0.5 * K)`, where `K` is the number of eligible, declared cells. Fit a Theil-Sen trend per cell from the twelve preceding eligible monthly profiles, predict one month ahead using actual month indices, clamp negative predictions to zero, and renormalize. If prediction is non-finite or has no positive mass, the feature is ineligible.
 
-The audited calibration input currently contains 2022-01 through 2022-12 only. It does not contain 12 preceding same-regime audited months for any 2022 target. Therefore it produces zero forecast-aligned calibration scores. The current 2022-only data cannot set the planned forecast threshold. Do not substitute an interpolation score, a 2023-2024 score, or an unreviewed regime. P4 distribution calibration remains unresolved until an adequately sized forecast-calibration period with a validated same-regime 12-month history is specified and reviewed. If such a period cannot be justified, leave distribution thresholds unset and keep distribution alerts disabled. This does not block exact checks, Polars reference validation, contract v2 work, or stage hooks.
+Compare observed and predicted vectors with Jensen-Shannon divergence using base-2 logarithms. Report the distance in bits and retain both vectors, support counts, eligibility mask, and calculation inputs. A distance is a discrepancy score, not evidence of source anomaly by itself.
 
-Once valid forecast-calibration scores exist, set a separate threshold for each feature: `threshold_j = max(calibration_forecast_scores_j) + 1e-12`. Alert when either feature exceeds its own threshold. Do not compare the two feature scales through one shared maximum. Persist each feature's calibration scores and threshold separately, and retain the per-feature alert indicators and combined OR decision.
+Use a separate threshold for each feature. Do not use one shared maximum across weekday-hour and zone profiles. Thresholds remain unset in the current protocol.
 
-The proposed minimum is 10 eligible forecast scores per feature. Its limited rationale is a nominal rank-tail calculation: if calibration and future scores were continuous, exchangeable observations, the chance that one future score exceeds the maximum of `m` calibration scores is `1/(m+1)`. This is 9.1% for `m=10` and 7.7% for `m=12`, per feature only. Monthly scores are serially dependent and may drift, so exchangeability is not established and these are not false-positive guarantees. With two features and an OR alert, a union-bound reference is up to 18.2% at 10 scores or 15.4% at 12 scores, under the same unverified assumptions. Across 24 distribution-eligible months, these correspond to rough alert-count references of up to 4.4 or 3.7, not predictions or acceptance targets. The observed run-level false-positive rate and uncertainty must be reported separately. Do not describe max calibration as conservative or interpret zero calibration exceedances as evidence of zero false alarms.
+## False-alert accounting for any future activation
 
-If fewer than 10 valid forecast scores per feature remain after the source review, do not derive thresholds. Record P4 distribution calibration as unresolved. Store the calibration period, source classifications, per-feature forecast scores, eligibility table, code identity, and hashes in a versioned artifact before any scored-period evaluation.
+Distribution alerts are disabled in the current protocol, so there is no distribution-alert rate or threshold claim. In any future protocol that enables them:
 
-## Eligibility and limitations
+- Every distribution alert contributes to the full system's run-level alert decision and therefore to the headline run-level false-positive rate on independently verified non-anomalous clean runs.
+- Also report the distribution-only run-level numerator and denominator, with each feature's eligible numerator and denominator. Do not present those as independent of the full-system rate.
+- Pre-register the alert budget before detector execution. For a threshold equal to the maximum of `m` exchangeable calibration scores, the nominal next-score exceedance probability is `1/(m+1)`: 9.1% for 10 scores and 7.7% for 12. For two feature alerts combined with OR, the union-bound values are 18.2% and 15.4%, corresponding to roughly 4.4 and 3.7 alerts over 24 eligible runs under those idealized assumptions.
+- A nominal 5% bound requires at least 19 calibration scores per feature if each feature is considered separately, and at least 39 per feature for a 5% two-feature union bound. These calculations assume exchangeability and do not establish an operational false-positive guarantee. Monthly dependence and drift weaken that assumption.
+- Report the actual eligible denominator and uncertainty. Do not use twelve repeated months as proof of a low operational false-alarm rate.
 
-- Exact checks run regardless of distribution-check eligibility.
-- Distribution checks require the 12 immediately preceding calendar months to be baseline-eligible under the frozen common month table, from the same contract, semantic schema cohort, and regime. 2023-01 through 2024-12 are a maximum potential scoring set of 24 months, not a guaranteed denominator. Generate and report the actual scorable-month table and denominator. All 2025 months remain distribution-ineligible under D3. Exact checks retain their separate 36-month denominator.
-- A month classified as a source anomaly or unresolved/disputed is not a clean calibration control. Record it separately under D4.
-- The 2022 data include observed source findings. Until the independent oracle and anomaly criteria classify them, no monthly profile may be called independently verified clean for threshold calibration.
-- Thresholds describe stability under this dataset and the declared pipeline only. They do not imply generalization to other years, fleets, or taxi systems.
+## Source review and limitations
 
-## Required review before freeze
+Source anomaly labels are assigned before distance calculations. A source statistic being reproducible does not make it anomalous. The current TLC data dictionary does not classify negative fares as source anomalies, so D4 category 2 is expected to be empty unless an independently registered official notice or other criterion supports it. Report the actual category counts and do not relabel after detector results.
 
-P4 distribution calibration is complete only after a forecast-aligned calibration period and its 12-month same-regime histories are justified, source eligibility is reviewed before distances are computed, at least 10 eligible forecast scores per feature remain, separate thresholds and the two-feature alert-rate implications are recorded, and the decision note/protocol references the hashed calibration artifact. No 2023-2025 scored-period detector outputs may be inspected to revise the method. Any later change requires a new version and a new untouched evaluation set. While this gate is unresolved, exact checks, reference validation, contract v2 work, and hooks may proceed, but distribution-alert evaluation may not.
+The owner is the sole reviewer and has already seen the 48-month audit aggregates, including the 447 far-out pickup rows in 2022-06 and the negative-fare and distance summaries. This is a disclosed source of selection bias, not independent blindness. No held-out output may be used to change eligibility labels or methods.
+
+An excluded or unresolved month can make later rolling windows ineligible. Windows never skip a month to recover twelve observations. For example, if 2022-06 is excluded, 2023-01 through 2023-06 each include that month in their immediately preceding twelve-month window and cannot be scored under this rule. Publish the month-level eligibility table and resulting denominator; do not assume all 24 potential months are scorable.
+
+## Reopening gate
+
+P4 remains disabled until a new versioned protocol resolves the forecast-aligned calibration period, minimum forecast-score count, per-feature alert budget, eligibility and support rules, and review artifact. That protocol must state the exact calibration and scoring months, all hashes, expected denominators, alert accounting, and clean-control evidence before any distance is computed. A defect or method change after freeze requires a new version and a fresh untouched evaluation set.

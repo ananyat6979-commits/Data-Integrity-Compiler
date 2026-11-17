@@ -1,6 +1,6 @@
 # M2a Contract v2 Decision Note
 
-**Status:** D1 through D8 are owner decisions. D2, D3, D4 and D7 are recorded here with the clarifications below. Contract v2 and the M2a protocol are not locked or frozen: P3, P4, P5, independent oracle definitions, catalog review, and implementation details remain. The experimental freeze occurs only at `m2a-frozen`.
+**Status:** D1 through D8 are owner decisions. D2, D3, D4 and D7 are recorded here with the clarifications below. D9 is a proposed amendment and is not yet an owner decision. Contract v2 and the M2a protocol are not locked or frozen: P3, P4, P5, independent oracle definitions, catalog review, and implementation details remain. The experimental freeze occurs only at `m2a-frozen`.
 **Evidence:** experiments/m2a/audit/schema_audit_2022-01_2025-12.json and experiments/m2a/audit/paired_null_audit_2022-01_2025-12.json. Both cover 48 monthly Yellow Taxi files from 2022-01 to 2025-12 and record source SHA-256 values. The paired-null report matches the schema audit on every monthly source hash and row count. The 2024-01, 2024-02 and 2025-01 hashes match the M1 evidence.
 **Scope:** contract v2 is a new contract. M1 evidence stays tied to the M1 contract hash; v2 files live under `contracts/v2/` so the v1 hash cannot change.
 
@@ -63,3 +63,16 @@ Decision: exclude these drifting rate and null-share features from distribution 
 ## 6. P1b result (null share of `passenger_count` and `RatecodeID`, months 2023-02 to 2024-12)
 
 The two columns have identical null shares in every month: 2.64%, 2.57%, 2.76%, 2.90%, 3.02%, 2.93%, 3.11% (2023-02 to 2023-08); 4.93%, 4.40%, 3.97%, 5.33% (2023-09 to 2023-12); 4.73%, 6.17%, 11.90%, 11.63%, 10.87%, 11.61%, 9.07%, 8.68%, 13.31%, 10.27%, 10.25%, 8.89% (2024-01 to 2024-12). There is no jump at the C1 to C2 boundary, but the share roughly doubles between 2024-02 and 2024-03 and stays elevated. The paired-null report includes 2025 row-level null and NaN counts, but 2025 remains excluded from D5 distribution-alert scoring.
+
+## 7. Proposed D9: distribution-alert deferral
+
+**Status: proposed for review, not yet an owner decision.** This proposal supersedes the P4 calibration language above for the current M2a evaluation if accepted.
+
+- Keep distribution alerts and all distribution thresholds disabled for the current M2a version. Use 36 exact monthly controls from 2023-01 through 2025-12. The 24 months from 2023-01 through 2024-12 are a maximum potential future distribution-score range, not a current denominator. The current distribution-alert denominator is zero.
+- Treat 2022 as source-review and warm-up material only. Do not fit leave-one-month-out thresholds from 2022. A 2022 profile cannot provide a forecast score without twelve preceding same-regime eligible months.
+- Keep exact reconciliation, independent references, fault hooks, and fault injection work moving. P4 deferral does not block those activities.
+- Any later activation requires a new protocol version. It must define a forecast-aligned calibration period with twelve immediately preceding eligible months per score, sufficient forecast-score count for each feature, the alert budget, feature eligibility, and exact scoring months before distances are computed. Do not skip gaps or use held-out results to tune.
+- Normalize weekday-hour profiles by weekday occurrence before comparison. Apply the support rule at the cell level, mark unsupported cells ineligible, and report excluded mass. Do not merge unsupported cells into an `other` bin.
+- If distribution alerts are enabled by a future protocol, each contributes to the full system's run-level alert and headline false-positive accounting, with feature-specific distribution rates also reported separately.
+
+The current TLC data dictionary does not classify negative fares as anomalies. D4 category 2 is expected to remain empty unless an official notice or other anomaly criterion is independently registered before detector execution. The owner is the sole reviewer and has seen the audit aggregates; this exposure is a threat to validity. The 2022-06 447-row far-out count was among the previously seen statistics.
