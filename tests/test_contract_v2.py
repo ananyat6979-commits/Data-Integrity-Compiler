@@ -1,0 +1,147 @@
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+import dic.pipeline as pipeline
+from dic.pipeline import build_v2_source_provenance, load_contract
+
+
+ROOT = Path(__file__).parents[1]
+V1_HASH = "947e696d07ed07482a9d542febf5a345693e5a1a29b4db5875dc0fbdeca3c953"
+
+
+@pytest.fixture
+def v2_root(tmp_path: Path) -> Path:
+    shutil.copytree(ROOT / "contracts", tmp_path / "contracts")
+    audit = tmp_path / "experiments/m2a/audit"
+    audit.mkdir(parents=True)
+    shutil.copy2(ROOT / "experiments/m2a/audit/schema_audit_2022-01_2025-12.json", audit)
+    return tmp_path
+
+
+def test_contract_version_defaults_to_pinned_v1_and_rejects_unknown_version():
+    assert load_contract(ROOT)[2] == V1_HASH
+    with pytest.raises(ValueError, match="Unsupported contract version"):
+        load_contract(ROOT, version="v3")
+
+
+def test_v2_contract_loads_and_hash_covers_yaml_and_schema(v2_root: Path):
+    _, schema, original_hash = load_contract(v2_root, version="v2")
+    assert schema["schema_contract"] == "tlc-yellow-v2-semantic"
+
+    yaml_path = v2_root / "contracts/v2/pipeline.yaml"
+    yaml_original = yaml_path.read_bytes()
+    yaml_path.write_bytes(yaml_original + b"\n# hash input change\n")
+    assert load_contract(v2_root, version="v2")[2] != original_hash
+    yaml_path.write_bytes(yaml_original)
+
+    schema_path = v2_root / "contracts/v2/tlc-yellow-v2.json"
+    schema_original = schema_path.read_bytes()
+    schema_doc = json.loads(schema_original)
+    schema_doc["schema_contract"] += "-revision"
+    schema_path.write_text(json.dumps(schema_doc), encoding="utf-8")
+    assert load_contract(v2_root, version="v2")[2] != original_hash
+
+
+def test_v2_contract_rejects_a_missing_or_modified_pinned_audit(v2_root: Path):
+    audit_path = v2_root / "experiments/m2a/audit/schema_audit_2022-01_2025-12.json"
+    audit_bytes = audit_path.read_bytes()
+    audit_path.write_bytes(audit_bytes + b" ")
+    with pytest.raises(ValueError, match="audit SHA-256"):
+        load_contract(v2_root, version="v2")
+    audit_path.unlink()
+    with pytest.raises(ValueError, match="existing file inside the repository"):
+        load_contract(v2_root, version="v2")
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement", "error"),
+    [
+        ("Airport_fee: [DOUBLE]", "Airport_fee: [VARCHAR]", "no physical type mapping"),
+        ("airport_fee: Airport_fee", "airport_fee: missing_column", "does not map source column"),
+    ],
+)
+def test_v2_contract_rejects_incomplete_or_invalid_normalization(
+    v2_root: Path, field: str, replacement: str, error: str
+):
+    yaml_path = v2_root / "contracts/v2/pipeline.yaml"
+    original = yaml_path.read_text(encoding="utf-8")
+    yaml_path.write_text(original.replace(field, replacement), encoding="utf-8")
+    with pytest.raises(ValueError, match=error):
+        load_contract(v2_root, version="v2")
+
+
+def test_v2_source_provenance_captures_physical_and_semantic_schemas(
+    v2_root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    audit = json.loads(
+        (v2_root / "experiments/m2a/audit/schema_audit_2022-01_2025-12.json").read_text()
+    )
+    entry = next(item for item in audit["months"] if item["month"] == "2022-01")
+    cohort = next(item for item in audit["cohorts"] if item["cohort_id"] == entry["cohort_id"])
+    source_path = tmp_path / entry["file"]
+    source_path.write_bytes(b"fixture placeholder for audited parquet")
+    resolved_source_path = source_path.resolve()
+    real_sha256 = pipeline.sha256
+    monkeypatch.setattr(
+        pipeline,
+        "sha256",
+        lambda path: entry["sha256"] if Path(path) == resolved_source_path else real_sha256(path),
+    )
+    real_stat = Path.stat
+
+    def stat_with_audited_size(path: Path, *args, **kwargs):
+        result = real_stat(path, *args, **kwargs)
+        if path == resolved_source_path:
+            return SimpleNamespace(st_size=entry["bytes"], st_mode=result.st_mode)
+        return result
+
+    monkeypatch.setattr(Path, "stat", stat_with_audited_size)
+    provenance = build_v2_source_provenance(
+        v2_root, source_path, "2022-01", cohort["columns"], entry["rows"]
+    )
+    assert provenance["source_month"] == "2022-01"
+    assert provenance["source_rows"] == entry["rows"]
+    assert provenance["audit"]["cohort_id"] == "C1"
+    assert provenance["original_columns"] == cohort["columns"]
+    airport = next(item for item in provenance["column_mapping"] if item["source_name"] == "airport_fee")
+    assert airport["semantic_name"] == "Airport_fee"
+    assert airport["source_type"] == airport["semantic_type"] == "DOUBLE"
+    assert "D:\\" not in json.dumps(provenance)
+
+
+def test_v2_source_provenance_rejects_mismatched_row_count(
+    v2_root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    audit = json.loads(
+        (v2_root / "experiments/m2a/audit/schema_audit_2022-01_2025-12.json").read_text()
+    )
+    entry = next(item for item in audit["months"] if item["month"] == "2022-01")
+    cohort = next(item for item in audit["cohorts"] if item["cohort_id"] == entry["cohort_id"])
+    source_path = tmp_path / entry["file"]
+    source_path.write_bytes(b"fixture placeholder for audited parquet")
+    resolved_source_path = source_path.resolve()
+    real_sha256 = pipeline.sha256
+    monkeypatch.setattr(
+        pipeline,
+        "sha256",
+        lambda path: entry["sha256"] if Path(path) == resolved_source_path else real_sha256(path),
+    )
+    real_stat = Path.stat
+
+    def stat_with_audited_size(path: Path, *args, **kwargs):
+        result = real_stat(path, *args, **kwargs)
+        if path == resolved_source_path:
+            return SimpleNamespace(st_size=entry["bytes"], st_mode=result.st_mode)
+        return result
+
+    monkeypatch.setattr(Path, "stat", stat_with_audited_size)
+    with pytest.raises(ValueError, match="Source bytes, row count, or physical schema differ"):
+        build_v2_source_provenance(
+            v2_root, source_path, "2022-01", cohort["columns"], entry["rows"] - 1
+        )
