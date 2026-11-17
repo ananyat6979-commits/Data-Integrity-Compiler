@@ -1,6 +1,6 @@
 # M2a Distribution Checks: P4 Draft
 
-**Status:** Proposed future method. Under proposed protocol v1.2, distribution alerts are disabled for the current M2a evaluation. This document does not authorize threshold fitting or detector runs. Re-enabling distribution alerts requires a new protocol version and a fresh review.
+**Status:** Proposed future method. Under adopted protocol v1.2, distribution alerts are disabled for the current M2a evaluation. This document does not authorize threshold fitting or detector runs. Re-enabling distribution alerts requires a new protocol version and a fresh review.
 
 ## Current M2a decision proposal
 
