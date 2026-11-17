@@ -1,6 +1,6 @@
 # M2a Experimental Protocol v1.2
 
-**Status:** Proposed amendment for review. This version is not frozen and does not authorize detector or held-out evaluation. It consists of protocol v1.1 plus the explicit amendments below. If accepted, v1.2 supersedes v1.1 wherever these amendments conflict. The experimental freeze still occurs only at `m2a-frozen`.
+**Status:** Versioned scope amendment adopted for the current M2a evaluation on 2026-11-17. It is not an experiment freeze and does not authorize held-out evaluation before the remaining Phase 0 gates pass. It consists of protocol v1.1 plus the explicit amendments below. V1.2 supersedes v1.1 wherever these amendments conflict. The experimental freeze still occurs only at `m2a-frozen`.
 
 ## Version purpose
 

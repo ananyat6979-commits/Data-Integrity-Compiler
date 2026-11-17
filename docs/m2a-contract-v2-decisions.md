@@ -1,6 +1,6 @@
 # M2a Contract v2 Decision Note
 
-**Status:** D1 through D8 are owner decisions. D2, D3, D4 and D7 are recorded here with the clarifications below. D9 is a proposed amendment and is not yet an owner decision. Contract v2 and the M2a protocol are not locked or frozen: P3, P4, P5, independent oracle definitions, catalog review, and implementation details remain. The experimental freeze occurs only at `m2a-frozen`.
+**Status:** D1 through D9 are owner decisions. D2, D3, D4 and D7 are recorded here with the clarifications below. D9 adopts distribution-alert deferral for the current M2a evaluation. Contract v2 and the M2a protocol are not locked or frozen: P3, P5, independent oracle definitions, catalog review, and implementation details remain. The experimental freeze occurs only at `m2a-frozen`.
 **Evidence:** experiments/m2a/audit/schema_audit_2022-01_2025-12.json and experiments/m2a/audit/paired_null_audit_2022-01_2025-12.json. Both cover 48 monthly Yellow Taxi files from 2022-01 to 2025-12 and record source SHA-256 values. The paired-null report matches the schema audit on every monthly source hash and row count. The 2024-01, 2024-02 and 2025-01 hashes match the M1 evidence.
 **Scope:** contract v2 is a new contract. M1 evidence stays tied to the M1 contract hash; v2 files live under `contracts/v2/` so the v1 hash cannot change.
 
@@ -66,7 +66,7 @@ The two columns have identical null shares in every month: 2.64%, 2.57%, 2.76%, 
 
 ## 7. Proposed D9: distribution-alert deferral
 
-**Status: proposed for review, not yet an owner decision.** This proposal supersedes the P4 calibration language above for the current M2a evaluation if accepted.
+**Status: adopted for the current M2a evaluation on 2026-11-17.** D9 supersedes the P4 calibration language above for this evaluation.
 
 - Keep distribution alerts and all distribution thresholds disabled for the current M2a version. This proposed amendment overrides the distribution-scoring clauses in D5, D8 and the earlier P4 draft. Use 36 exact monthly controls from 2023-01 through 2025-12. The 24 months from 2023-01 through 2024-12 are a maximum potential future distribution-score range, not a current denominator. The current distribution-alert denominator is zero.
 - Treat 2022 as source-review and warm-up material only. Do not fit leave-one-month-out thresholds from 2022. A 2022 profile cannot provide a forecast score without twelve preceding same-regime eligible months.
