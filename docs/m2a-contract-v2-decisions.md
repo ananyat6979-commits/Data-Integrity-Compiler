@@ -42,8 +42,9 @@ Decision: exclude these drifting rate and null-share features from any future di
 ## 3. Consequences for denominators
 
 - Exact-reconciliation controls: 36 months (2023-01 to 2025-12), by D3.
-- Distribution-alert eligible months: 24 (2023-01 to 2024-12), by D3 and D5. All 12 months of 2025 are ineligible. Which features can alert is governed by D8.
-- Zero alerts in 24 eligible months still leaves a 95% upper bound of about 12 to 14% on the false-alarm rate.
+- Current protocol v1.2 distribution-alert denominator: 0, because alerts are disabled under D9.
+- Potential future distribution-score range: at most 24 months (2023-01 to 2024-12), by D3 and D5. All 12 months of 2025 remain outside that potential range. Actual future eligibility would need a separately reviewed month table and protocol version.
+- A future evaluation with 24 eligible clean monthly runs and zero alerts would still have an approximate 95% upper false-alarm bound of 12 to 14%, before accounting for dependence. This is a planning calculation, not a v1.2 result.
 
 ## 4. Outstanding prerequisites
 
