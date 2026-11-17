@@ -1,6 +1,6 @@
 # M2a Contract v2 Decision Note
 
-**Status:** D1 through D8 are owner decisions. D2, D3, D4 and D7 are recorded here with the clarifications below. Contract v2 and the M2a protocol are not locked or frozen: P3, P4, P5, independent oracle definitions, catalog review, and implementation details remain. The experimental freeze occurs only at `m2a-frozen`.
+**Status:** D1 through D9 are owner decisions. D2, D3, D4 and D7 are recorded here with the clarifications below. D9 adopts distribution-alert deferral for the current M2a evaluation. Contract v2 and the M2a protocol are not locked or frozen: P3, P5, independent oracle definitions, catalog review, and implementation details remain. The experimental freeze occurs only at `m2a-frozen`.
 **Evidence:** experiments/m2a/audit/schema_audit_2022-01_2025-12.json and experiments/m2a/audit/paired_null_audit_2022-01_2025-12.json. Both cover 48 monthly Yellow Taxi files from 2022-01 to 2025-12 and record source SHA-256 values. The paired-null report matches the schema audit on every monthly source hash and row count. The 2024-01, 2024-02 and 2025-01 hashes match the M1 evidence.
 **Scope:** contract v2 is a new contract. M1 evidence stays tied to the M1 contract hash; v2 files live under `contracts/v2/` so the v1 hash cannot change.
 
@@ -37,20 +37,21 @@
 - The null share of `passenger_count` and `RatecodeID` (identical in each month) is about 2.6% to 3.1% from 2023-02 to 2023-08, 4.0% to 5.3% from 2023-09 to 2024-01, 6.2% in 2024-02, then 11.9% in 2024-03 and 8.7% to 13.3% for the rest of 2024.
 - The negative-fare share rises steadily from 0.5% (2022-01) to 2.1% (2024-12); the non-positive distance share has a 2023 episode; the far-out pickup count falls each year.
 
-Decision: exclude these drifting rate and null-share features from distribution alerts (null shares of `passenger_count` and `RatecodeID`, negative-fare share, non-positive-distance share, far-out pickup count). Distribution checks use within-month shape features (for example hour-of-day and weekday-by-hour profiles, pickup-zone mix, fare-per-mile relation) compared by a trend-robust distance. The feature definitions, the distance function and the alert thresholds are defined and frozen before held-out evaluation (P4); 2022 warm-up data is used for stability checks. Exact reconciliation checks are unaffected, because they compare against independent recomputation from the same file and not against history. Disclosure: this feature policy was informed by previously inspected monthly statistics (the null-share series and aggregate counts); it is not blind and must not be described as blind.
+Decision: exclude these drifting rate and null-share features from any future distribution alerts (null shares of `passenger_count` and `RatecodeID`, negative-fare share, non-positive-distance share, far-out pickup count). Distribution checks may use within-month shape features (for example hour-of-day and weekday-by-hour profiles and pickup-zone mix) under a later reviewed protocol. The feature definitions, distance function and thresholds remain proposals. Under proposed D9, no feature distances or distribution thresholds are computed in the current evaluation. Exact reconciliation checks are unaffected, because they compare against independent recomputation from the same file and not against history. Disclosure: this feature policy was informed by previously inspected monthly statistics (the null-share series and aggregate counts); it is not blind and must not be described as blind.
 
 ## 3. Consequences for denominators
 
 - Exact-reconciliation controls: 36 months (2023-01 to 2025-12), by D3.
-- Distribution-alert eligible months: 24 (2023-01 to 2024-12), by D3 and D5. All 12 months of 2025 are ineligible. Which features can alert is governed by D8.
-- Zero alerts in 24 eligible months still leaves a 95% upper bound of about 12 to 14% on the false-alarm rate.
+- Current protocol v1.2 distribution-alert denominator: 0, because alerts are disabled under D9.
+- Potential future distribution-score range: at most 24 months (2023-01 to 2024-12), by D3 and D5. All 12 months of 2025 remain outside that potential range. Actual future eligibility would need a separately reviewed month table and protocol version.
+- A future evaluation with 24 eligible clean monthly runs and zero alerts would still have an approximate 95% upper false-alarm bound of 12 to 14%, before accounting for dependence. This is a planning calculation, not a v1.2 result.
 
 ## 4. Outstanding prerequisites
 
 - **P1, P1b (done).** See sections 5 and 6.
 - **P2 (column comparison complete with documented limits).** The review is recorded in `docs/m2a-contract-v2-data-dictionary-review.md`, including all 20 audit columns, cohort spellings/types, field meanings and evidence limits.
 - **P3.** Start a simple per-task hours log now. Earlier Phase 0 and schema-audit time was not logged and will not be reconstructed. Record hours for remaining work for the November 24 progress review.
-- **P4 (draft prepared, not complete).** Proposed features, distance, and 2022-only threshold derivation are documented in `docs/m2a-distribution-checks-p4-draft.md`. Numeric thresholds remain unset until the independent source review classifies eligible 2022 months. Review and hash the calibration artifact before any detector code is run on 2023 or 2024 months.
+- **P4 (deferred under proposed D9).** Candidate features and a future forecast method are documented in `docs/m2a-distribution-checks-p4-draft.md`. The 2022 files are not a calibration set. Distribution alerts and thresholds remain disabled in the current evaluation. Reopening P4 requires a new reviewed protocol and a forecast-aligned calibration design.
 - **P5.** Record the original source column names and types per file in contract v2 provenance (D1), next to the normalized semantic schema.
 
 ## 5. P1 result (months 2022-01 to 2023-01)
@@ -63,3 +64,16 @@ Decision: exclude these drifting rate and null-share features from distribution 
 ## 6. P1b result (null share of `passenger_count` and `RatecodeID`, months 2023-02 to 2024-12)
 
 The two columns have identical null shares in every month: 2.64%, 2.57%, 2.76%, 2.90%, 3.02%, 2.93%, 3.11% (2023-02 to 2023-08); 4.93%, 4.40%, 3.97%, 5.33% (2023-09 to 2023-12); 4.73%, 6.17%, 11.90%, 11.63%, 10.87%, 11.61%, 9.07%, 8.68%, 13.31%, 10.27%, 10.25%, 8.89% (2024-01 to 2024-12). There is no jump at the C1 to C2 boundary, but the share roughly doubles between 2024-02 and 2024-03 and stays elevated. The paired-null report includes 2025 row-level null and NaN counts, but 2025 remains excluded from D5 distribution-alert scoring.
+
+## 7. Proposed D9: distribution-alert deferral
+
+**Status: adopted for the current M2a evaluation on 2026-11-17.** D9 supersedes the P4 calibration language above for this evaluation.
+
+- Keep distribution alerts and all distribution thresholds disabled for the current M2a version. This proposed amendment overrides the distribution-scoring clauses in D5, D8 and the earlier P4 draft. Use 36 exact monthly controls from 2023-01 through 2025-12. The 24 months from 2023-01 through 2024-12 are a maximum potential future distribution-score range, not a current denominator. The current distribution-alert denominator is zero.
+- Treat 2022 as source-review and warm-up material only. Do not fit leave-one-month-out thresholds from 2022. A 2022 profile cannot provide a forecast score without twelve preceding same-regime eligible months.
+- Keep exact reconciliation, independent references, fault hooks, and fault injection work moving. P4 deferral does not block those activities.
+- Any later activation requires a new protocol version. It must define a forecast-aligned calibration period with twelve immediately preceding eligible months per score, sufficient forecast-score count for each feature, the alert budget, feature eligibility, and exact scoring months before distances are computed. Do not skip gaps or use held-out results to tune. A count of ten eligible 2022 months does not meet this gate.
+- Normalize weekday-hour profiles by weekday occurrence before comparison. Apply the support rule at the cell level, mark unsupported cells ineligible, and report excluded mass. Do not merge unsupported cells into an `other` bin.
+- If distribution alerts are enabled by a future protocol, each contributes to the full system's run-level alert and headline false-positive accounting, with feature-specific distribution rates also reported separately.
+
+The current TLC data dictionary does not classify negative fares as anomalies. D4 category 2 is expected to remain empty unless an official notice or other anomaly criterion is independently registered before detector execution. The owner is the sole reviewer and has seen the audit aggregates; this exposure is a threat to validity. The 2022-06 447-row far-out count was among the previously seen statistics.
