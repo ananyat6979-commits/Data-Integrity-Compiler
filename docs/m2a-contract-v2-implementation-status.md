@@ -13,7 +13,7 @@
 
 ## Still required before Phase 1 acceptance
 
-- Produce and verify a compact source manifest against all 48 actual source files and the audit, rather than relying on the single local provenance smoke check. The v2 runner validates its own selected source before materialization.
+- The 48-file source manifest was generated from the local raw directory and all files matched pinned SHA-256, byte size, row count, physical schema and cohort. Its manifest digest is `11db74829a7820870666a5ada355ce3f684366ec038446ebd9647b9996283b71`. Run `python experiments/m2a/validate_source_manifest.py --raw data/raw --out experiments/m2a/audit/source_manifest_v2.json` to reopen and validate the raw files again. The compact `--verify-only` mode checks the report schema, manifest digest, contract hash and audit consistency, but does not reopen Parquet or independently reproduce row-level results.
 - Validate reference-stage calculations against the hand-computed fixtures in the oracle specification.
 - Resolve P4 calibration before enabling distribution alerts. This proposal sets no thresholds.
 - End-to-end test the v2 command with audited full-data files, including publication behavior, before claiming Phase 1 acceptance.
