@@ -12,6 +12,7 @@ from experiments.m2a.oracles import (
     reference_aggregate,
     reference_clean,
     reference_join,
+    reference_daily_zone_metrics,
     reference_timestamp_offset,
 )
 
@@ -155,3 +156,24 @@ def test_aggregation_reference_matches_hand_sums_means_and_group_keys():
         ("d2", 2, ("decimal", "5.00")),
         ("d4", 3, ("decimal", "12.00")),
     ]
+
+
+def test_reference_means_use_exact_decimal_rounding_to_six_places():
+    source = pl.DataFrame({
+        "pickup_date": [datetime(2024, 1, 1).date()] * 3,
+        "pickup_zone": [1, 1, 1],
+        "fare_amount": pl.Series([Decimal("1.00"), Decimal("0.00"), Decimal("0.00")],
+                                  dtype=pl.Decimal(precision=18, scale=2)),
+    })
+    grouped_mean = reference_aggregate(source, ["pickup_zone"], "mean")
+    assert grouped_mean.get_column("fare_amount").to_list() == [Decimal("0.333333")]
+
+    daily_input = source.rename({"fare_amount": "fare_decimal"})
+    daily = reference_daily_zone_metrics(daily_input)
+    assert daily.to_dicts() == [{
+        "pickup_date": datetime(2024, 1, 1).date(),
+        "pickup_zone": 1,
+        "trip_count": 3,
+        "revenue": Decimal("1.00"),
+        "average_fare": Decimal("0.333333"),
+    }]

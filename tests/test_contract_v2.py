@@ -9,9 +9,11 @@ from types import SimpleNamespace
 
 import pytest
 import duckdb
+import polars as pl
 
 import dic.pipeline as pipeline
 from dic.pipeline import build_v2_source_provenance, load_contract, run
+from experiments.m2a.verify_v2_run import verify_v2_run
 
 
 ROOT = Path(__file__).parents[1]
@@ -272,3 +274,28 @@ def test_v2_subprocess_run_rejects_far_out_rows_without_blocking(
     assert report["peak_memory"]["scope"] == "dedicated_experiment_process"
     assert report["source_provenance"]["source_rows"] == 4
     assert report["source_provenance"]["audit"]["cohort_id"] == cohort_id
+    run_dir = tmp_path / "data/runs" / report["run_id"]
+    verification = verify_v2_run(tmp_path, run_dir, trips, lookup)
+    assert verification["verification"] == "valid_independent_reconciliation"
+    assert all(result["matches"] for result in verification["stages"].values())
+
+    lookup.write_text(
+        "LocationID,Borough,Zone,service_zone\n1,Manhattan,Alpha,Yellow\n"
+        "1,Manhattan,Alpha,Yellow\n2,Queens,Beta,Boro\n",
+        encoding="utf-8",
+    )
+    blocked_report = run(trips, lookup, tmp_path, contract_version="v2")
+    assert blocked_report["outcome"] == "blocked"
+    assert blocked_report["publication"]["pointer_before"] == report["run_id"]
+    assert blocked_report["publication"]["pointer_after"] == report["run_id"]
+    blocked_dir = tmp_path / "data/runs" / blocked_report["run_id"]
+    blocked_verification = verify_v2_run(tmp_path, blocked_dir, trips, lookup)
+    assert blocked_verification["verification"] == "valid_independent_reconciliation"
+    assert blocked_verification["publication_decision"] == "blocked"
+    assert blocked_verification["current_run_id"] == report["run_id"]
+
+    metrics_path = blocked_dir / "daily_zone_metrics.parquet"
+    metrics = pl.read_parquet(metrics_path)
+    metrics.with_columns((pl.col("trip_count") + 1).alias("trip_count")).write_parquet(metrics_path)
+    with pytest.raises(ValueError, match="Independent daily_zone_metrics reconciliation failed"):
+        verify_v2_run(tmp_path, blocked_dir, trips, lookup)

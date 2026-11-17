@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 import polars as pl
@@ -139,5 +139,44 @@ def reference_aggregate(frame: pl.DataFrame, group_columns: list[str],
     if operation not in {"sum", "mean"}:
         raise ValueError(f"Unsupported reference aggregation: {operation}")
     fare = pl.col("fare_amount").cast(pl.Decimal(precision=18, scale=2), strict=False)
-    aggregate = fare.sum() if operation == "sum" else fare.mean().round(6)
-    return frame.group_by(group_columns).agg(aggregate.alias("fare_amount")).sort(group_columns)
+    if operation == "sum":
+        return frame.group_by(group_columns).agg(fare.sum().alias("fare_amount")).sort(group_columns)
+    grouped = frame.group_by(group_columns).agg(
+        fare.sum().alias("_fare_sum"), fare.count().alias("_fare_count")
+    )
+    records = []
+    for row in grouped.iter_rows(named=True):
+        record = {column: row[column] for column in group_columns}
+        count = row["_fare_count"]
+        record["fare_amount"] = (
+            (row["_fare_sum"] / Decimal(count)).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+            if count else None
+        )
+        records.append(record)
+    schema = {column: frame.schema[column] for column in group_columns}
+    schema["fare_amount"] = pl.Decimal(precision=18, scale=6)
+    return pl.DataFrame(records, schema=schema, orient="row").sort(group_columns)
+
+
+def reference_daily_zone_metrics(frame: pl.DataFrame) -> pl.DataFrame:
+    fare = pl.col("fare_decimal").cast(pl.Decimal(precision=18, scale=2), strict=False)
+    grouped = frame.group_by(["pickup_date", "pickup_zone"]).agg(
+        pl.len().alias("trip_count"), fare.sum().alias("revenue"), fare.count().alias("_fare_count")
+    )
+    records = []
+    for row in grouped.iter_rows(named=True):
+        count = row["_fare_count"]
+        records.append({
+            "pickup_date": row["pickup_date"],
+            "pickup_zone": row["pickup_zone"],
+            "trip_count": row["trip_count"],
+            "revenue": row["revenue"],
+            "average_fare": (
+                (row["revenue"] / Decimal(count)).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+                if count else None
+            ),
+        })
+    schema = {"pickup_date": frame.schema["pickup_date"], "pickup_zone": frame.schema["pickup_zone"],
+              "trip_count": pl.Int64, "revenue": pl.Decimal(precision=18, scale=2),
+              "average_fare": pl.Decimal(precision=18, scale=6)}
+    return pl.DataFrame(records, schema=schema, orient="row").sort(["pickup_date", "pickup_zone"])
