@@ -27,7 +27,7 @@ def main() -> None:
     try:
         result = run_in_process(Path(args["trips_path"]), Path(args["lookup_path"]), root,
                                 args.get("fault_id"), Path(args["reference_lookup"]) if args.get("reference_lookup") else None,
-                                args.get("test_failpoint"))
+                                args.get("test_failpoint"), args.get("contract_version", "v1"))
     except Exception as exc:
         current = root / "data" / "published" / "CURRENT"
         selected = None

@@ -83,4 +83,4 @@ Licensed under Apache-2.0. Copyright 2026 Ananya Tiwari. NYC TLC data and the zo
 
 The notebook runs the February 2024 and January 2025 clean controls, two January 2024 clean runs for fingerprint repeatability, and the blocked M1 duplicate-key experiment. It exports the January clean run named by reconciliation, its manifest and contract hash, the repeat run, and the fault evidence. It evaluates against private ground truth inside the Kaggle run but keeps that file out of the ordinary result export. This single fault is not a recall or false-alarm benchmark.
 
-The M2a experimental protocol is versioned in [docs/m2a-protocol-v1.md](docs/m2a-protocol-v1.md). It is a review-gated specification, not evidence that M2a has been implemented or evaluated.
+The current M2a experimental protocol is [docs/m2a-protocol-v1.2.md](docs/m2a-protocol-v1.2.md). It is a review-gated specification, not evidence that M2a has been implemented or evaluated. The opt-in v2 runner is under development; existing commands continue to use contract v1 unless `--contract-version v2` is explicitly selected.

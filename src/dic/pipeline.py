@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -426,11 +426,12 @@ def _rows(con: duckdb.DuckDBPyConnection, query: str) -> list[tuple[Any, ...]]:
 
 
 def run(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = None,
-       reference_lookup: Path | None = None, _test_failpoint: str | None = None) -> dict[str, Any]:
+       reference_lookup: Path | None = None, _test_failpoint: str | None = None,
+       contract_version: str = "v1") -> dict[str, Any]:
     args = {"trips_path": str(trips_path.resolve()), "lookup_path": str(lookup_path.resolve()),
             "root": str(root.resolve()), "fault_id": fault_id,
             "reference_lookup": str(reference_lookup.resolve()) if reference_lookup else None,
-            "test_failpoint": _test_failpoint}
+            "test_failpoint": _test_failpoint, "contract_version": contract_version}
     completed = subprocess.run([sys.executable, "-m", "dic.worker"], input=json.dumps(args),
                                text=True, capture_output=True, cwd=root)
     if completed.returncode:
@@ -442,9 +443,10 @@ def run(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = 
 
 
 def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = None,
-                   reference_lookup: Path | None = None, test_failpoint: str | None = None) -> dict[str, Any]:
+                   reference_lookup: Path | None = None, test_failpoint: str | None = None,
+                   contract_version: str = "v1") -> dict[str, Any]:
     started = time.perf_counter()
-    contract, schema_contract, contract_hash = load_contract(root)
+    contract, schema_contract, contract_hash = load_contract(root, version=contract_version)
     contract_id = contract["contract_id"]
     run_id = uuid.uuid4().hex
     runs = root / "data" / "runs"
@@ -453,7 +455,33 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
     con = connect()
     trips_sql = trips_path.resolve().as_posix().replace("'", "''")
     input_hash = sha256(trips_path)
-    con.execute(f"CREATE VIEW raw AS SELECT *, '{input_hash}'::VARCHAR AS source_sha256, file_row_number AS source_row_ordinal FROM read_parquet('{trips_sql}', file_row_number=true)")
+    physical_schema = [
+        {"name": row[0], "type": str(row[1])}
+        for row in con.execute(f"DESCRIBE SELECT * FROM read_parquet('{trips_sql}')").fetchall()
+    ]
+    source_provenance = None
+    source_month = None
+    lower_bound = upper_bound = None
+    if contract_version == "v2":
+        source_month_match = re.fullmatch(r"yellow_tripdata_(\d{4}-\d{2})\.parquet", trips_path.name)
+        if source_month_match is None:
+            raise ValueError("Contract v2 runs require a source named yellow_tripdata_YYYY-MM.parquet")
+        source_month = source_month_match.group(1)
+        source_rows = int(con.execute(f"SELECT count(*) FROM read_parquet('{trips_sql}')").fetchone()[0])
+        source_provenance = build_v2_source_provenance(root, trips_path, source_month, physical_schema, source_rows)
+        aliases = contract["normalization"]["column_aliases"]
+        canonical_by_fold = {name.casefold(): name for name in schema_contract["columns"]}
+        projection = []
+        for item in physical_schema:
+            source_name = item["name"]
+            semantic_name = aliases.get(source_name, canonical_by_fold.get(source_name.casefold()))
+            if semantic_name is None:
+                raise ValueError(f"Contract v2 cannot normalize source column {source_name}")
+            projection.append(f"{_quote_identifier(source_name)} AS {_quote_identifier(semantic_name)}")
+        raw_projection = ", ".join(projection)
+        con.execute(f"CREATE VIEW raw AS SELECT {raw_projection}, '{input_hash}'::VARCHAR AS source_sha256, file_row_number AS source_row_ordinal FROM read_parquet('{trips_sql}', file_row_number=true)")
+    else:
+        con.execute(f"CREATE VIEW raw AS SELECT *, '{input_hash}'::VARCHAR AS source_sha256, file_row_number AS source_row_ordinal FROM read_parquet('{trips_sql}', file_row_number=true)")
     cols = {x[0] for x in con.execute("DESCRIBE raw").fetchall()}
     missing = set(schema_contract["required_columns"]) - cols
     if missing:
@@ -461,10 +489,28 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
     join_key = contract["join"]["key"]
     if join_key not in cols:
         raise ValueError(f"Configured join key {join_key} is absent from the input schema")
-    predicates, params = zip(*[_compile_rule(rule) for rule in contract["cleaning"]["rules"]])
+    cleaning_rules = list(contract["cleaning"]["rules"])
+    compiled_rules = [_compile_rule(rule) for rule in cleaning_rules]
+    if contract_version == "v2":
+        date_rule = contract["date_coverage"]
+        date_rule_id = date_rule["rule_id"]
+        if any(rule["id"] == date_rule_id for rule in cleaning_rules):
+            raise ValueError(f"Contract v2 date rule ID duplicates a cleaning rule: {date_rule_id}")
+        month_start = datetime.strptime(source_month + "-01", "%Y-%m-%d")
+        lower_bound = month_start + timedelta(days=date_rule["lower_offset_days"])
+        if month_start.month == 12:
+            next_month_start = month_start.replace(year=month_start.year + 1, month=1)
+        else:
+            next_month_start = month_start.replace(month=month_start.month + 1)
+        upper_bound = next_month_start + timedelta(days=date_rule["upper_offset_days"])
+        pickup_ts = f"try_cast({_quote_identifier('tpep_pickup_datetime')} AS TIMESTAMP)"
+        date_predicate = f"{pickup_ts} >= ? AND {pickup_ts} < ?"
+        cleaning_rules.append({"id": date_rule_id, "column": "tpep_pickup_datetime", "operator": "date_window"})
+        compiled_rules.append((date_predicate, [lower_bound, upper_bound]))
+    predicates, params = zip(*compiled_rules)
     failed_case_parts = []
     case_params: list[Any] = []
-    for rule, (predicate, rule_params) in zip(contract["cleaning"]["rules"], zip(predicates, params)):
+    for rule, (predicate, rule_params) in zip(cleaning_rules, zip(predicates, params)):
         failed_case_parts.append(f"WHEN NOT ({predicate}) THEN ?")
         case_params.extend(rule_params)
         case_params.append(rule["id"])
@@ -477,7 +523,7 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
     con.execute(f"CREATE TEMP TABLE assessed AS SELECT *, {first_failure_sql} AS first_failed_rule FROM ({clean_select}) clean_source", case_params)
     con.execute("CREATE TEMP VIEW clean AS SELECT * FROM assessed WHERE first_failed_rule IS NULL")
     rejected_by_rule = {rule_id: count for rule_id, count in con.execute("SELECT first_failed_rule, count(*) FROM assessed WHERE first_failed_rule IS NOT NULL GROUP BY 1").fetchall()}
-    rejected_by_rule = {rule["id"]: int(rejected_by_rule.get(rule["id"], 0)) for rule in contract["cleaning"]["rules"]}
+    rejected_by_rule = {rule["id"]: int(rejected_by_rule.get(rule["id"], 0)) for rule in cleaning_rules}
     clean_n = con.execute("SELECT count(*) FROM clean").fetchone()[0]
     raw_n = con.execute("SELECT count(*) FROM raw").fetchone()[0]
     if raw_n - clean_n != sum(rejected_by_rule.values()):
@@ -605,6 +651,17 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
       "versions":{"compiler":__version__,"python":platform.python_version(),"duckdb":duckdb.__version__,"contract":str(contract["contract_version"]),"cleaning":str(contract["cleaning"]["version"])},
       "row_counts":{**counts,"enriched_candidate_rows":con.execute("SELECT count(*) FROM trip_enriched").fetchone()[0]},
       "logical_output_hashes":outputs}
+    if contract_version == "v2":
+        report["source_month"] = source_month
+        report["source_provenance"] = source_provenance
+        report["date_coverage"] = {
+            "rule_id": contract["date_coverage"]["rule_id"],
+            "lower_bound_inclusive": lower_bound.isoformat(sep=" "),
+            "upper_bound_exclusive": upper_bound.isoformat(sep=" "),
+            "handling": contract["date_coverage"]["handling"],
+            "rejected_rows": rejected_by_rule[contract["date_coverage"]["rule_id"]],
+            "alerts": 0,
+        }
     validate_report(report)
     manifest = {"manifest_version": "dic-manifest-v1", "run_id": run_id,
                 "inputs": {"trips_sha256": input_hash, "lookup_sha256": sha256(lookup_path),
@@ -613,6 +670,9 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
                 "contract_version": contract["contract_version"], "contract_sha256": contract_hash,
                 "configuration_version": "pipeline-v2", "row_counts": counts,
                 "logical_output_hashes": outputs}
+    if contract_version == "v2":
+        manifest["source_month"] = source_month
+        manifest["source_provenance"] = source_provenance
     _write_json(stage / "manifest.json", manifest)
     _write_json(stage / "report.json", report)
     if not contract_failed:

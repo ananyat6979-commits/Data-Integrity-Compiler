@@ -6,9 +6,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import duckdb
 
 import dic.pipeline as pipeline
-from dic.pipeline import build_v2_source_provenance, load_contract
+from dic.pipeline import build_v2_source_provenance, load_contract, run_in_process
 
 
 ROOT = Path(__file__).parents[1]
@@ -167,3 +168,46 @@ def test_v2_source_provenance_rejects_mismatched_row_count(
         build_v2_source_provenance(
             v2_root, source_path, "2022-01", cohort["columns"], entry["rows"] - 1
         )
+
+
+def test_v2_run_rejects_far_out_rows_by_rule_without_blocking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    shutil.copytree(ROOT / "contracts", tmp_path / "contracts")
+    audit = tmp_path / "experiments/m2a/audit"
+    audit.mkdir(parents=True)
+    shutil.copy2(ROOT / "experiments/m2a/audit/schema_audit_2022-01_2025-12.json", audit)
+    trips = tmp_path / "yellow_tripdata_2023-01.parquet"
+    con = duckdb.connect()
+    con.execute(
+        """COPY (SELECT * FROM (VALUES
+          (TIMESTAMP '2022-12-31 23:59:00', TIMESTAMP '2023-01-01 00:10:00', 1, 2, 10.00, 2.0),
+          (TIMESTAMP '2023-01-31 23:59:00', TIMESTAMP '2023-02-01 00:10:00', 1, 2, 20.00, 3.0),
+          (TIMESTAMP '2023-02-01 23:59:00', TIMESTAMP '2023-02-02 00:10:00', 2, 1, 5.00, 1.0),
+          (TIMESTAMP '2023-02-02 00:00:00', TIMESTAMP '2023-02-02 00:15:00', 2, 1, 8.00, 1.0)
+        ) t(tpep_pickup_datetime,tpep_dropoff_datetime,PULocationID,DOLocationID,fare_amount,trip_distance))
+        TO '{}' (FORMAT PARQUET)""".format(trips.as_posix().replace("'", "''"))
+    )
+    con.close()
+    lookup = tmp_path / "lookup.csv"
+    lookup.write_text(
+        "LocationID,Borough,Zone,service_zone\n1,Manhattan,Alpha,Yellow\n2,Queens,Beta,Boro\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "build_v2_source_provenance",
+        lambda *args, **kwargs: {"source_month": "2023-01", "fixture": True},
+    )
+
+    report = run_in_process(trips, lookup, tmp_path, contract_version="v2")
+
+    assert report["contract_version"] == 2
+    assert report["source_month"] == "2023-01"
+    assert report["date_coverage"]["lower_bound_inclusive"] == "2022-12-31 00:00:00"
+    assert report["date_coverage"]["upper_bound_exclusive"] == "2023-02-02 00:00:00"
+    assert report["date_coverage"]["rejected_rows"] == 1
+    assert report["date_coverage"]["alerts"] == 0
+    assert report["cleaning"]["rejected_rows_by_rule"]["far_out_pickup"] == 1
+    assert report["cleaning"]["total_rejected_rows"] == 1
+    assert report["row_counts"]["raw_trips"] == 4
+    assert report["row_counts"]["clean_trips"] == 3
+    assert report["outcome"] == "passed"

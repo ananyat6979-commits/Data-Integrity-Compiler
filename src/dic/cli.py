@@ -13,7 +13,7 @@ def main() -> None:
     p = argparse.ArgumentParser(prog="dic")
     sub = p.add_subparsers(dest="cmd", required=True)
     a = sub.add_parser("acquire"); a.add_argument("--month", required=True)
-    r = sub.add_parser("run"); r.add_argument("--month", required=True); r.add_argument("--lookup", type=Path); r.add_argument("--reference-lookup", type=Path); r.add_argument("--fault-id")
+    r = sub.add_parser("run"); r.add_argument("--month", required=True); r.add_argument("--lookup", type=Path); r.add_argument("--reference-lookup", type=Path); r.add_argument("--fault-id"); r.add_argument("--contract-version", choices=("v1", "v2"), default="v1")
     i = sub.add_parser("inject-m1"); i.add_argument("--month", required=True); i.add_argument("--key", required=True)
     e = sub.add_parser("evaluate"); e.add_argument("--report", type=Path, required=True); e.add_argument("--ground-truth", type=Path, required=True)
     x = sub.add_parser("experiment-m1"); x.add_argument("--month", required=True); x.add_argument("--key", required=True)
@@ -26,7 +26,7 @@ def main() -> None:
     if args.cmd == "acquire":
         result = acquire(root / "data/raw", args.month)
     elif args.cmd == "run":
-        result = run(root / "data/raw" / f"yellow_tripdata_{args.month}.parquet", args.lookup or root / "data/raw/taxi_zone_lookup.csv", root, args.fault_id, args.reference_lookup or root / "data/raw/taxi_zone_lookup.csv")
+        result = run(root / "data/raw" / f"yellow_tripdata_{args.month}.parquet", args.lookup or root / "data/raw/taxi_zone_lookup.csv", root, args.fault_id, args.reference_lookup or root / "data/raw/taxi_zone_lookup.csv", contract_version=args.contract_version)
     elif args.cmd == "inject-m1":
         result = {k: str(v) for k, v in inject_m1(root / "data/raw/taxi_zone_lookup.csv", root / "data/runs", args.key).items()}
     elif args.cmd == "experiment-m1":
