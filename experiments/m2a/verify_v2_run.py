@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
+import duckdb
 
-from dic.pipeline import load_contract, sha256, validate_report
+from dic.pipeline import build_v2_source_provenance, load_contract, sha256, validate_report
 from experiments.m2a.oracles import canonical_rows, reference_clean, reference_daily_zone_metrics, reference_join
 
 
@@ -57,6 +58,17 @@ def _load_inputs(root: Path, source_path: Path, lookup_path: Path,
     raw = pl.read_parquet(source_path)
     if raw.height != report.get("source_provenance", {}).get("source_rows"):
         raise ValueError("Source row count differs from report provenance")
+    source_sql = source_path.as_posix().replace("'", "''")
+    with duckdb.connect(":memory:") as con:
+        physical_schema = [
+            {"name": row[0], "type": str(row[1])}
+            for row in con.execute(f"DESCRIBE SELECT * FROM read_parquet('{source_sql}')").fetchall()
+        ]
+    provenance = build_v2_source_provenance(
+        root, source_path, _source_month(report), physical_schema, raw.height
+    )
+    if report.get("source_provenance") != provenance:
+        raise ValueError("Report source provenance differs from the independently checked source audit")
     renames: dict[str, str] = {}
     canonical_by_fold = {name.casefold(): name for name in schema["columns"]}
     aliases = contract["normalization"]["column_aliases"]
