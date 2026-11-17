@@ -22,6 +22,7 @@ Requires Python 3.10 to 3.13. From this directory:
 py -3.10 -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -r requirements-lock.txt
+python -m pip install -r requirements-m2a-oracle-lock.txt
 python -m pip install --no-deps -e .
 ```
 
@@ -83,4 +84,4 @@ Licensed under Apache-2.0. Copyright 2026 Ananya Tiwari. NYC TLC data and the zo
 
 The notebook runs the February 2024 and January 2025 clean controls, two January 2024 clean runs for fingerprint repeatability, and the blocked M1 duplicate-key experiment. It exports the January clean run named by reconciliation, its manifest and contract hash, the repeat run, and the fault evidence. It evaluates against private ground truth inside the Kaggle run but keeps that file out of the ordinary result export. This single fault is not a recall or false-alarm benchmark.
 
-The current M2a experimental protocol is [docs/m2a-protocol-v1.2.md](docs/m2a-protocol-v1.2.md). It is a review-gated specification, not evidence that M2a has been implemented or evaluated. Phase 1 now has an opt-in v2 run path and a validated 48-month source manifest. Existing commands continue to use contract v1 unless `--contract-version v2` is explicitly selected. Run `python experiments/m2a/validate_source_manifest.py --verify-only --manifest experiments/m2a/audit/source_manifest_v2.json` to check the compact manifest's internal consistency, contract pin and source-audit agreement. This compact check does not reopen Parquet or reproduce row-level source results; run the command with `--raw` and `--out` to repeat the actual source validation.
+The current M2a experimental protocol is [docs/m2a-protocol-v1.2.md](docs/m2a-protocol-v1.2.md). It is a review-gated specification, not evidence that M2a has been evaluated. Phase 1 now has an opt-in v2 run path, a validated 48-month source manifest, and independent Polars reference fixtures. Fault hooks, production-available detectors and the full evaluation harness are still under development. Existing commands continue to use contract v1 unless `--contract-version v2` is explicitly selected. Run `python experiments/m2a/validate_source_manifest.py --verify-only --manifest experiments/m2a/audit/source_manifest_v2.json` to check the compact manifest's internal consistency, contract pin and source-audit agreement. This compact check does not reopen Parquet or reproduce row-level source results; run the command with `--raw` and `--out` to repeat the actual source validation.
