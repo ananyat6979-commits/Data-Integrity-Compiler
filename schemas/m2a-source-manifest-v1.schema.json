@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dic-m2a-source-manifest-v1",
+  "type": "object",
+  "required": ["manifest_version", "contract_id", "contract_version", "contract_sha256", "audit_sha256", "audit_sha256_method", "source_count", "validation", "entries", "manifest_sha256"],
+  "properties": {
+    "manifest_version": {"const": "dic-m2a-source-manifest-v1"},
+    "contract_id": {"type": "string"},
+    "contract_version": {"const": 2},
+    "contract_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "audit_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "audit_sha256_method": {"const": "utf8_lf_normalized"},
+    "source_count": {"const": 48},
+    "validation": {"const": "passed"},
+    "entries": {
+      "type": "array",
+      "minItems": 48,
+      "maxItems": 48,
+      "items": {
+        "type": "object",
+        "required": ["month", "file", "source_sha256", "bytes", "rows", "physical_schema_sha256", "cohort_id", "status"],
+        "properties": {
+          "month": {"type": "string", "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"},
+          "file": {"type": "string", "pattern": "^yellow_tripdata_\\d{4}-(0[1-9]|1[0-2])\\.parquet$"},
+          "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "bytes": {"type": "integer", "minimum": 1},
+          "rows": {"type": "integer", "minimum": 1},
+          "physical_schema_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "cohort_id": {"type": "string", "minLength": 1},
+          "status": {"const": "validated"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "additionalProperties": false
+}

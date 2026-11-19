@@ -12,6 +12,7 @@ dependencies = ["duckdb==1.2.2", "PyYAML==6.0.2", "jsonschema==4.23.0", "psutil=
 
 [project.optional-dependencies]
 dev = ["pytest==8.3.5"]
+m2a-oracle = ["polars==1.44.2"]
 
 [project.scripts]
 dic = "dic.cli:main"

@@ -1,0 +1,68 @@
+contract_id: dic-taxi-pipeline-v2
+contract_version: 2
+schema_file: tlc-yellow-v2.json
+source_audit:
+  path: experiments/m2a/audit/schema_audit_2022-01_2025-12.json
+  sha256: b3c90659cf8bfd1044afcc6a514c5009f9988f6efb5696673e6f900143740471
+  sha256_method: utf8_lf_normalized
+  audit_version: 1
+  months: [2022-01, 2022-02, 2022-03, 2022-04, 2022-05, 2022-06, 2022-07, 2022-08, 2022-09, 2022-10, 2022-11, 2022-12, 2023-01, 2023-02, 2023-03, 2023-04, 2023-05, 2023-06, 2023-07, 2023-08, 2023-09, 2023-10, 2023-11, 2023-12, 2024-01, 2024-02, 2024-03, 2024-04, 2024-05, 2024-06, 2024-07, 2024-08, 2024-09, 2024-10, 2024-11, 2024-12, 2025-01, 2025-02, 2025-03, 2025-04, 2025-05, 2025-06, 2025-07, 2025-08, 2025-09, 2025-10, 2025-11, 2025-12]
+normalization:
+  column_name_case: case_insensitive
+  column_aliases:
+    airport_fee: Airport_fee
+  source_type_map:
+    VendorID: [BIGINT, INTEGER]
+    tpep_pickup_datetime: [TIMESTAMP]
+    tpep_dropoff_datetime: [TIMESTAMP]
+    passenger_count: [DOUBLE, BIGINT]
+    trip_distance: [DOUBLE]
+    RatecodeID: [DOUBLE, BIGINT]
+    store_and_fwd_flag: [VARCHAR]
+    PULocationID: [BIGINT, INTEGER]
+    DOLocationID: [BIGINT, INTEGER]
+    payment_type: [BIGINT, INTEGER]
+    fare_amount: [DOUBLE]
+    extra: [DOUBLE]
+    mta_tax: [DOUBLE]
+    tip_amount: [DOUBLE]
+    tolls_amount: [DOUBLE]
+    improvement_surcharge: [DOUBLE]
+    total_amount: [DOUBLE]
+    congestion_surcharge: [DOUBLE]
+    Airport_fee: [DOUBLE]
+    cbd_congestion_fee: [DOUBLE]
+schema_policy:
+  added_optional_columns: compatible
+  unrecognized_added_columns: review
+  removed_optional_columns: review
+  missing_required_columns: incompatible
+cleaning:
+  version: 2
+  rules:
+    - {id: pickup_timestamp_present, column: tpep_pickup_datetime, operator: not_null}
+    - {id: pickup_timestamp_parseable, column: tpep_pickup_datetime, operator: parseable_timestamp}
+    - {id: dropoff_timestamp_present, column: tpep_dropoff_datetime, operator: not_null}
+    - {id: dropoff_timestamp_parseable, column: tpep_dropoff_datetime, operator: parseable_timestamp}
+    - {id: pickup_zone_present, column: PULocationID, operator: not_null}
+    - {id: nonnegative_fare, column: fare_amount, operator: ">=", cast_type: decimal_18_2, value: 0}
+    - {id: positive_distance, column: trip_distance, operator: ">", cast_type: double, value: 0}
+date_coverage:
+  rule_id: far_out_pickup
+  lower_offset_days: -1
+  upper_offset_days: 1
+  upper_bound: exclusive
+  handling: reject_row_and_count_without_alert
+join:
+  key: PULocationID
+  lookup_key: LocationID
+  cardinality: many_to_one
+  cardinality_severity: block
+  lookup_uniqueness_severity: block
+  key_non_null: true
+  unmatched_policy: exclude
+  diagnostic_join: left_preserves_all_input_rows
+evaluation:
+  exact_month_range: [2023-01, 2025-12]
+  distribution_month_range: [2023-01, 2024-12]
+  regime_boundary_month: 2025-01
