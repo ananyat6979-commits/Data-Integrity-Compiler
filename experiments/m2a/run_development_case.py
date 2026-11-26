@@ -6,13 +6,14 @@ import argparse
 import json
 import shutil
 from dataclasses import asdict
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
 import polars as pl
 
 from dic.pipeline import SourceAuditMismatch, load_contract, run
 from experiments.m2a.fault_hooks import prepare_case
+from experiments.m2a.oracles import reference_daily_zone_metrics
 from experiments.m2a.verify_v2_run import verify_v2_run
 
 
@@ -164,21 +165,108 @@ def run_ingestion_case(
     }
 
 
+def run_stage_case(
+    repository: Path, workspace: Path, source: Path, lookup: Path, severity: str, seed: int,
+    *, fault_id: str,
+) -> dict:
+    """Compare a development stage mutation with verified clean output."""
+    if fault_id not in {"cleaning_fare_threshold", "aggregation_sum_to_mean"}:
+        raise ValueError("Unsupported development stage case")
+    execution = _prepare_execution(repository, workspace)
+    runs = execution / "data/runs"
+    clean = run(source, lookup, execution, contract_version="v2")
+    if clean["publication"]["decision"] != "published":
+        raise ValueError("The clean control did not publish")
+    control = runs / clean["run_id"]
+    verify_v2_run(execution, control, source, lookup)
+
+    def table(directory: Path, name: str) -> pl.DataFrame:
+        return pl.read_parquet(directory / f"{name}.parquet")
+
+    clean_metrics = table(control, "daily_zone_metrics")
+    enriched = table(control, "trip_enriched")
+    tables = ("clean_trips", "diagnostic_join", "trip_enriched")
+    if fault_id == "cleaning_fare_threshold":
+        candidates = pl.read_parquet(source, columns=["fare_amount"])
+        _, truth = prepare_case(fault_id, severity, seed, candidates)
+        dropped = pl.col("source_row_ordinal").is_in(list(truth.selected_ordinals))
+        selected = list(truth.selected_ordinals)
+        expected_metrics = reference_daily_zone_metrics(enriched.filter(~dropped))
+        removed_rows = table(control, "clean_trips").filter(dropped).height
+    else:
+        aggregation_input = enriched.rename({"fare_decimal": "fare_amount"})
+        inputs, truth = prepare_case(fault_id, severity, seed, aggregation_input)
+        # The existing hook uses the catalog ranker and records the selected keys.
+        inputs.stage_hooks["aggregation"](aggregation_input)
+        keys = set(truth.selected_keys)
+        selected = sorted(f"{day}|{zone}" for day, zone in keys)
+        sums_and_counts = {
+            (day, zone): (count, revenue)
+            for day, zone, count, revenue in clean_metrics.select(
+                "pickup_date", "pickup_zone", "trip_count", "revenue"
+            ).iter_rows()
+        }
+        means = []
+        for key, (count, revenue) in sums_and_counts.items():
+            means.append(
+                (revenue / count).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                if key in keys else revenue
+            )
+        expected_metrics = clean_metrics.with_columns(
+            pl.Series("revenue", means, dtype=clean_metrics.schema["revenue"])
+        )
+        removed_rows = 0
+
+    observed = run(source, lookup, execution, contract_version="v2",
+                   _development_override={"stage": truth.stage, "selected": selected})
+    candidate = runs / observed["run_id"]
+    for name in tables:
+        expected = table(control, name)
+        if truth.stage == "cleaning":
+            expected = expected.filter(~dropped)
+        if not table(candidate, name).equals(expected):
+            raise ValueError(f"Unexpected difference in {name}")
+    if not table(candidate, "daily_zone_metrics").equals(expected_metrics):
+        raise ValueError("Daily zone metrics differ from independently calculated fault effects")
+    if observed["row_counts"]["clean_trips"] != clean["row_counts"]["clean_trips"] - removed_rows:
+        raise ValueError("Reported retained rows do not match the evaluated fault")
+
+    evaluator = workspace / "evaluator"
+    evaluator.mkdir()
+    (evaluator / "ground_truth.stage.json").write_text(
+        json.dumps(asdict(truth), default=str, indent=2) + "\n", encoding="utf-8"
+    )
+    return {
+        "clean_run_id": clean["run_id"],
+        "observed_run_id": observed["run_id"],
+        "publication_decision": observed["publication"]["decision"],
+        "removed_clean_rows": removed_rows,
+        "revenue_delta": str(expected_metrics["revenue"].sum() - clean_metrics["revenue"].sum()),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--lookup", type=Path, required=True)
-    parser.add_argument("--case", choices=("duplicate-lookup", "duplicate-ingestion"), default="duplicate-lookup")
+    parser.add_argument("--case", choices=("duplicate-lookup", "duplicate-ingestion",
+                                          "cleaning-fare-threshold", "aggregation-sum-to-mean"),
+                        default="duplicate-lookup")
     parser.add_argument("--severity", choices=("low", "medium", "high"), default="low")
     parser.add_argument("--seed", type=int, choices=(11, 29, 47), default=11)
     args = parser.parse_args()
-    runner = run_ingestion_case if args.case == "duplicate-ingestion" else run_lookup_case
-    result = runner(
+    inputs = (
         args.repository.resolve(), args.workspace.resolve(), args.source.resolve(),
         args.lookup.resolve(), args.severity, args.seed,
     )
+    if args.case == "duplicate-ingestion":
+        result = run_ingestion_case(*inputs)
+    elif args.case == "duplicate-lookup":
+        result = run_lookup_case(*inputs)
+    else:
+        result = run_stage_case(*inputs, fault_id=args.case.replace("-", "_"))
     print(json.dumps(result, indent=2))
 
 

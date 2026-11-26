@@ -444,11 +444,12 @@ _V1_FARE_AVERAGE = "avg(fare_decimal)::DECIMAL(18,6)"
 
 def run(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = None,
        reference_lookup: Path | None = None, _test_failpoint: str | None = None,
-       contract_version: str = "v1") -> dict[str, Any]:
+       contract_version: str = "v1", *, _development_override: dict | None = None) -> dict[str, Any]:
     args = {"trips_path": str(trips_path.resolve()), "lookup_path": str(lookup_path.resolve()),
             "root": str(root.resolve()), "fault_id": fault_id,
             "reference_lookup": str(reference_lookup.resolve()) if reference_lookup else None,
-            "test_failpoint": _test_failpoint, "contract_version": contract_version}
+            "test_failpoint": _test_failpoint, "contract_version": contract_version,
+            "development_override": _development_override}
     completed = subprocess.run([sys.executable, "-m", "dic.worker"], input=json.dumps(args),
                                text=True, capture_output=True, cwd=root)
     if completed.returncode:
@@ -461,7 +462,21 @@ def run(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = 
 
 def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = None,
                    reference_lookup: Path | None = None, test_failpoint: str | None = None,
-                   contract_version: str = "v1") -> dict[str, Any]:
+                   contract_version: str = "v1", *, development_override: dict | None = None) -> dict[str, Any]:
+    override_stage = None
+    selected = []
+    if development_override is not None:
+        if contract_version != "v2" or set(development_override) != {"stage", "selected"}:
+            raise ValueError("Invalid v2 development override")
+        override_stage = development_override["stage"]
+        selected = development_override["selected"]
+        if (
+            not isinstance(selected, list) or not selected
+            or (override_stage == "cleaning" and not all(type(i) is int and i >= 0 for i in selected))
+            or (override_stage == "aggregation" and not all(isinstance(i, str) for i in selected))
+            or override_stage not in {"cleaning", "aggregation"}
+        ):
+            raise ValueError("Invalid v2 development selection")
     started = time.perf_counter()
     contract, schema_contract, contract_hash = load_contract(root, version=contract_version)
     contract_id = contract["contract_id"]
@@ -528,6 +543,9 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
     failed_case_parts = []
     case_params: list[Any] = []
     for rule, (predicate, rule_params) in zip(cleaning_rules, zip(predicates, params)):
+        if override_stage == "cleaning" and rule["id"] == "nonnegative_fare":
+            predicate = f"({predicate}) AND NOT contains(?::BIGINT[], source_row_ordinal)"
+            rule_params = [*rule_params, selected]
         failed_case_parts.append(f"WHEN NOT ({predicate}) THEN ?")
         case_params.extend(rule_params)
         case_params.append(rule["id"])
@@ -610,10 +628,24 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
     con.execute("""CREATE TABLE trip_enriched AS SELECT * FROM diagnostic WHERE matched_key IS NOT NULL
       AND NOT ?""", [contract_failed])
     # If blocked, keep a candidate for evidence only; no promotion occurs below.
+    revenue = "sum(fare_decimal)::DECIMAL(18,2)"
+    revenue_params = []
+    if override_stage == "aggregation":
+        cents = "(abs(sum(fare_decimal)) * 100)::HUGEINT"
+        count = "count(fare_decimal)"
+        mean_at_cents = (
+            f"(sign(sum(fare_decimal)) * (({cents} + {count} // 2) // nullif({count}, 0))"
+            " * 0.01::DECIMAL(3,2))::DECIMAL(18,2)"
+        )
+        revenue = (
+            "CASE WHEN contains(?::VARCHAR[], concat(pickup_date, '|', pickup_zone)) "
+            f"THEN {mean_at_cents} ELSE {revenue} END"
+        )
+        revenue_params = [selected]
     con.execute(f"""CREATE TABLE daily_zone_metrics AS SELECT pickup_date, pickup_zone,
-      count(*)::BIGINT AS trip_count, sum(fare_decimal)::DECIMAL(18,2) AS revenue,
+      count(*)::BIGINT AS trip_count, {revenue} AS revenue,
       {fare_average} AS average_fare
-      FROM diagnostic WHERE matched_key IS NOT NULL GROUP BY 1,2 ORDER BY 1,2""")
+      FROM diagnostic WHERE matched_key IS NOT NULL GROUP BY 1,2 ORDER BY 1,2""", revenue_params)
     # Stream stage outputs to Parquet inside DuckDB (no Python-side row materialization) and compute
     # an order-independent logical hash per table: row count + sum of per-row value hashes.
     # Values (decimals, nulls, dates) are hashed as values, never as file bytes.

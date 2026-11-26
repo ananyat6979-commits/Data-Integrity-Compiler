@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 from datetime import datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,7 +14,7 @@ import polars as pl
 
 import dic.pipeline as pipeline
 from dic.pipeline import build_v2_source_provenance, load_contract, run
-from experiments.m2a.run_development_case import run_ingestion_case, run_lookup_case
+from experiments.m2a.run_development_case import run_ingestion_case, run_lookup_case, run_stage_case
 from experiments.m2a.verify_v2_run import verify_v2_run
 
 
@@ -213,6 +214,8 @@ def test_v2_subprocess_run_rejects_far_out_rows_without_blocking(
     upper = next_month + timedelta(days=1)
     pickup_times = [lower + timedelta(days=1) - timedelta(minutes=1), month_start,
                     upper - timedelta(minutes=1), upper]
+    if month == "2024-01":
+        pickup_times[0] = month_start + timedelta(minutes=1)
     fixture_rows = [
         {"tpep_pickup_datetime": pickup_times[0].strftime("%Y-%m-%d %H:%M:%S"),
          "tpep_dropoff_datetime": (pickup_times[0] + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S"),
@@ -300,7 +303,7 @@ def test_v2_subprocess_run_rejects_far_out_rows_without_blocking(
         assert result["publication_decision"] == "blocked"
         assert result["current_run_id"] == result["clean_run_id"]
         truth = json.loads((workspace / "evaluator/ground_truth.lookup.json").read_text())
-        expected = {1: (4, "60.00", 2), 2: (2, "10.00", 1)}
+        expected = {1: (4, "60.00", 1), 2: (2, "10.00", 1)}
         rows, revenue, groups = expected[truth["selected_keys"][0]]
         assert (result["row_inflation"], result["revenue_delta"], result["affected_groups"]) == (
             rows, revenue, groups
@@ -326,6 +329,22 @@ def test_v2_subprocess_run_rejects_far_out_rows_without_blocking(
         assert json.loads(failure.read_text(encoding="utf-8"))["error_type"] == "SourceAuditMismatch"
         assert list(intake.rglob("ground_truth*")) == []
         assert (ingestion / "evaluator/ground_truth.ingestion.json").is_file()
+        assert original_pointer.read_bytes() == original
+
+        for fault_id in ("cleaning_fare_threshold", "aggregation_sum_to_mean"):
+            stage_workspace = tmp_path / fault_id
+            stage_result = run_stage_case(
+                tmp_path, stage_workspace, trips, lookup, "high", 11, fault_id=fault_id
+            )
+            assert stage_result["publication_decision"] == "published"
+            if fault_id == "aggregation_sum_to_mean":
+                assert stage_result["removed_clean_rows"] == 0
+                assert stage_result["revenue_delta"] == "-15.00"
+            else:
+                assert stage_result["removed_clean_rows"] > 0
+                assert Decimal(stage_result["revenue_delta"]) < 0
+            assert list((stage_workspace / "execution").rglob("ground_truth*")) == []
+            assert (stage_workspace / "evaluator/ground_truth.stage.json").is_file()
         assert original_pointer.read_bytes() == original
 
     lookup.write_text(
