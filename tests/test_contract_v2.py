@@ -13,6 +13,7 @@ import polars as pl
 
 import dic.pipeline as pipeline
 from dic.pipeline import build_v2_source_provenance, load_contract, run
+from experiments.m2a.run_development_case import run_lookup_case
 from experiments.m2a.verify_v2_run import verify_v2_run
 
 
@@ -278,6 +279,30 @@ def test_v2_subprocess_run_rejects_far_out_rows_without_blocking(
     verification = verify_v2_run(tmp_path, run_dir, trips, lookup)
     assert verification["verification"] == "valid_independent_reconciliation"
     assert all(result["matches"] for result in verification["stages"].values())
+
+    if month == "2024-01":
+        workspace = tmp_path / "lookup-case"
+        original_pointer = tmp_path / "data/published/CURRENT"
+        original = original_pointer.read_bytes()
+        result = run_lookup_case(tmp_path, workspace, trips, lookup, "medium", 11)
+        assert result["publication_decision"] == "blocked"
+        assert result["current_run_id"] == result["clean_run_id"]
+        truth = json.loads((workspace / "evaluator/ground_truth.lookup.json").read_text())
+        expected = {1: (4, "60.00", 2), 2: (2, "10.00", 1)}
+        rows, revenue, groups = expected[truth["selected_keys"][0]]
+        assert (result["row_inflation"], result["revenue_delta"], result["affected_groups"]) == (
+            rows, revenue, groups
+        )
+        isolated = workspace / "execution"
+        observed_path = isolated / "data/runs" / result["observed_run_id"] / "report.json"
+        observed_report = json.loads(observed_path.read_text())
+        assert observed_report["fault_id"] is None
+        assert observed_report["checks"][0]["id"] == "lookup_non_null_unique"
+        assert observed_report["checks"][0]["passed"] is False
+        assert list(isolated.rglob("ground_truth*")) == []
+        assert original_pointer.read_bytes() == original
+        with pytest.raises(FileExistsError):
+            run_lookup_case(tmp_path, workspace, trips, lookup, "medium", 11)
 
     lookup.write_text(
         "LocationID,Borough,Zone,service_zone\n1,Manhattan,Alpha,Yellow\n"
