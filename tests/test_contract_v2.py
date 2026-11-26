@@ -21,6 +21,18 @@ ROOT = Path(__file__).parents[1]
 V1_HASH = "947e696d07ed07482a9d542febf5a345693e5a1a29b4db5875dc0fbdeca3c953"
 
 
+def test_v2_average_rounds_decimal_ties_exactly():
+    with duckdb.connect() as con:
+        result = con.execute(f"""
+            SELECT {pipeline._V2_FARE_AVERAGE}
+            FROM (
+                SELECT CASE WHEN i = 0 THEN 19.22 ELSE 19.29 END::DECIMAL(18,2) AS fare_decimal
+                FROM range(160) AS rows(i)
+            ) fares
+        """).fetchone()
+    assert str(result[0]) == "19.289563"
+
+
 @pytest.fixture
 def v2_root(tmp_path: Path) -> Path:
     shutil.copytree(ROOT / "contracts", tmp_path / "contracts")

@@ -425,6 +425,17 @@ def _rows(con: duckdb.DuckDBPyConnection, query: str) -> list[tuple[Any, ...]]:
     return con.execute(query).fetchall()
 
 
+# The v2 oracle rounds the exact mean half away from zero at six decimal places.
+# Keep the numerator in integer millionths until the final decimal conversion.
+_V2_FARE_AVERAGE = """(
+    sign(sum(fare_decimal)) * (
+        ((abs(sum(fare_decimal)) * 1000000)::HUGEINT + count(fare_decimal) // 2)
+        // nullif(count(fare_decimal), 0)
+    ) * 0.000001::DECIMAL(7,6)
+)::DECIMAL(18,6)"""
+_V1_FARE_AVERAGE = "avg(fare_decimal)::DECIMAL(18,6)"
+
+
 def run(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = None,
        reference_lookup: Path | None = None, _test_failpoint: str | None = None,
        contract_version: str = "v1") -> dict[str, Any]:
@@ -585,16 +596,17 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
         bool(null_join_rows) and join_settings["key_non_null"],
     ]
     contract_failed = any(blocking_failures)
-    deltas = _aggregate_deltas(con, duplicates)
+    fare_average = _V2_FARE_AVERAGE if contract_version == "v2" else _V1_FARE_AVERAGE
+    deltas = _aggregate_deltas(con, duplicates, fare_average)
     validation_seconds = time.perf_counter() - validation_started
     current_path = root / "data" / "published" / "CURRENT"
     pointer_before = json.loads(current_path.read_text(encoding="utf8")).get("run_id") if current_path.exists() else None
     con.execute("""CREATE TABLE trip_enriched AS SELECT * FROM diagnostic WHERE matched_key IS NOT NULL
       AND NOT ?""", [contract_failed])
     # If blocked, keep a candidate for evidence only; no promotion occurs below.
-    con.execute("""CREATE TABLE daily_zone_metrics AS SELECT pickup_date, pickup_zone,
+    con.execute(f"""CREATE TABLE daily_zone_metrics AS SELECT pickup_date, pickup_zone,
       count(*)::BIGINT AS trip_count, sum(fare_decimal)::DECIMAL(18,2) AS revenue,
-      avg(fare_decimal)::DECIMAL(18,6) AS average_fare
+      {fare_average} AS average_fare
       FROM diagnostic WHERE matched_key IS NOT NULL GROUP BY 1,2 ORDER BY 1,2""")
     # Stream stage outputs to Parquet inside DuckDB (no Python-side row materialization) and compute
     # an order-independent logical hash per table: row count + sum of per-row value hashes.
@@ -853,22 +865,23 @@ def _publish_impl(stage: Path, published: Path, run_id: str, report: dict[str, A
     candidate.unlink(missing_ok=True)
 
 
-def _aggregate_deltas(con: duckdb.DuckDBPyConnection, duplicate_keys: dict[str, int]) -> list[dict[str, Any]]:
+def _aggregate_deltas(con: duckdb.DuckDBPyConnection, duplicate_keys: dict[str, int],
+                      fare_average: str = _V1_FARE_AVERAGE) -> list[dict[str, Any]]:
     """Compare observed fanout to a one-row-per-key reference without reading injector ground truth."""
     if not duplicate_keys:
         return []
-    rows = con.execute("""WITH one_lookup AS (
+    rows = con.execute(f"""WITH one_lookup AS (
         SELECT *, row_number() OVER (PARTITION BY lookup_zone ORDER BY Zone, Borough) AS rn FROM lookup
       ), clean_metrics AS (
         SELECT c.pickup_date, c.pickup_zone, count(*)::BIGINT AS trips,
           sum(c.fare_decimal)::DECIMAL(18,2) AS revenue,
-          avg(c.fare_decimal)::DECIMAL(18,6) AS avg_fare
+          {fare_average} AS avg_fare
         FROM clean c JOIN one_lookup l ON c.pickup_zone=l.lookup_zone AND l.rn=1
         GROUP BY 1,2
       ), observed_metrics AS (
         SELECT pickup_date, pickup_zone, count(*)::BIGINT AS trips,
           sum(fare_decimal)::DECIMAL(18,2) AS revenue,
-          avg(fare_decimal)::DECIMAL(18,6) AS avg_fare
+          {fare_average} AS avg_fare
         FROM diagnostic WHERE matched_key IS NOT NULL GROUP BY 1,2
       )
       SELECT coalesce(o.pickup_date,c.pickup_date), coalesce(o.pickup_zone,c.pickup_zone),
