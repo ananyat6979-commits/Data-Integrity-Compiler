@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 import shutil
 from dataclasses import asdict
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
 import polars as pl
+import duckdb
+import dic.pipeline as pipeline
+import dic.worker as worker
 
-from dic.pipeline import SourceAuditMismatch, load_contract, run
+from dic.pipeline import SourceAuditMismatch, load_contract, run, sha256
+from experiments.m2a import development_ledger, fault_hooks, oracles
 from experiments.m2a.fault_hooks import prepare_case
 from experiments.m2a.oracles import reference_daily_zone_metrics
 from experiments.m2a.verify_v2_run import verify_v2_run
@@ -245,28 +250,67 @@ def run_stage_case(
     }
 
 
+def _identity(args) -> dict:
+    _, _, contract_hash = load_contract(args.repository, version="v2")
+    code = {
+        module.__name__: sha256(Path(module.__file__))
+        for module in (development_ledger, fault_hooks, oracles, pipeline, worker)
+    }
+    code["runner"] = sha256(Path(__file__))
+    code["verifier"] = sha256(Path(__file__).with_name("verify_v2_run.py"))
+    code["report_schema"] = sha256(Path(pipeline.__file__).resolve().parents[2] / "schemas/report-v2.schema.json")
+    return {
+        "split": "development",
+        "case": args.case,
+        "severity": args.severity,
+        "seed": args.seed,
+        "source": {"name": args.source.name, "sha256": sha256(args.source)},
+        "lookup_sha256": sha256(args.lookup),
+        "contract_sha256": contract_hash,
+        "catalog_sha256": sha256(fault_hooks.CATALOG_PATH),
+        "code": code,
+        "runtime": {"python": platform.python_version(), "platform": platform.system(),
+                    "duckdb": duckdb.__version__, "polars": pl.__version__},
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--lookup", type=Path, required=True)
+    parser.add_argument("--ledger", type=Path, help="Append verified results and resume matching development cases")
     parser.add_argument("--case", choices=("duplicate-lookup", "duplicate-ingestion",
                                           "cleaning-fare-threshold", "aggregation-sum-to-mean"),
                         default="duplicate-lookup")
     parser.add_argument("--severity", choices=("low", "medium", "high"), default="low")
     parser.add_argument("--seed", type=int, choices=(11, 29, 47), default=11)
     args = parser.parse_args()
-    inputs = (
-        args.repository.resolve(), args.workspace.resolve(), args.source.resolve(),
-        args.lookup.resolve(), args.severity, args.seed,
-    )
-    if args.case == "duplicate-ingestion":
-        result = run_ingestion_case(*inputs)
-    elif args.case == "duplicate-lookup":
-        result = run_lookup_case(*inputs)
+    def run_case(attempt: Path) -> dict:
+        inputs = (args.repository.resolve(), attempt, args.source.resolve(),
+                  args.lookup.resolve(), args.severity, args.seed)
+        if args.case == "duplicate-ingestion":
+            return run_ingestion_case(*inputs)
+        if args.case == "duplicate-lookup":
+            return run_lookup_case(*inputs)
+        return run_stage_case(*inputs, fault_id=args.case.replace("-", "_"))
+
+    workspace = args.workspace.resolve()
+    if args.ledger is None:
+        result = run_case(workspace)
     else:
-        result = run_stage_case(*inputs, fault_id=args.case.replace("-", "_"))
+        identity = _identity(args)
+
+        def run_verified(attempt: Path) -> dict:
+            outcome = run_case(attempt)
+            if _identity(args) != identity:
+                raise ValueError("Development case identity changed during execution")
+            return outcome
+
+        result = development_ledger.execute_or_resume(
+            workspace, args.ledger.resolve(), identity, run_verified
+        )
     print(json.dumps(result, indent=2))
 
 
