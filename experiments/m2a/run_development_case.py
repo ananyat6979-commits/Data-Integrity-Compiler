@@ -1,4 +1,4 @@
-"""Run the development lookup fault through the contract v2 worker."""
+"""Run development faults through the contract v2 worker."""
 
 from __future__ import annotations
 
@@ -11,15 +11,12 @@ from pathlib import Path
 
 import polars as pl
 
-from dic.pipeline import load_contract, run
+from dic.pipeline import SourceAuditMismatch, load_contract, run
 from experiments.m2a.fault_hooks import prepare_case
 from experiments.m2a.verify_v2_run import verify_v2_run
 
 
-def run_lookup_case(
-    repository: Path, workspace: Path, source: Path, lookup: Path, severity: str, seed: int
-) -> dict:
-    """Run a clean control and one lookup case in a new, isolated workspace."""
+def _prepare_execution(repository: Path, workspace: Path) -> Path:
     contract, _, _ = load_contract(repository, version="v2")
     audit_path = Path(contract["source_audit"]["path"])
     workspace.mkdir(parents=True, exist_ok=False)
@@ -27,7 +24,14 @@ def run_lookup_case(
     shutil.copytree(repository / "contracts/v2", execution / "contracts/v2")
     (execution / audit_path).parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(repository / audit_path, execution / audit_path)
+    return execution
 
+
+def run_lookup_case(
+    repository: Path, workspace: Path, source: Path, lookup: Path, severity: str, seed: int
+) -> dict:
+    """Run a clean control and one lookup case in a new, isolated workspace."""
+    execution = _prepare_execution(repository, workspace)
     clean = run(source, lookup, execution, contract_version="v2")
     if clean["publication"]["decision"] != "published":
         raise ValueError("The clean control did not publish")
@@ -95,16 +99,83 @@ def run_lookup_case(
     }
 
 
+def run_ingestion_case(
+    repository: Path, workspace: Path, source: Path, lookup: Path, severity: str, seed: int
+) -> dict:
+    """Verify that a source with appended duplicate rows fails the intake audit."""
+    execution = _prepare_execution(repository, workspace)
+    clean = run(source, lookup, execution, contract_version="v2")
+    if clean["publication"]["decision"] != "published":
+        raise ValueError("The clean control did not publish")
+    current = execution / "data/published/CURRENT"
+    before = current.read_bytes()
+    runs = execution / "data/runs"
+    previous_runs = {path.name for path in runs.iterdir()}
+
+    original = pl.read_parquet(source)
+    inputs, truth = prepare_case("ingestion_duplicate_records", severity, seed, original)
+    observed_path = execution / "observed-source" / source.name
+    observed_path.parent.mkdir()
+    inputs.source.write_parquet(observed_path)
+
+    # Reopen the actual worker input and compare the ordered prefix and appended rows.
+    observed = pl.read_parquet(observed_path)
+    expected = original.with_row_index().filter(
+        pl.col("index").is_in(list(truth.selected_ordinals))
+    ).drop("index")
+    if (
+        observed.height != original.height + int(truth.parameters["duplicate_rows"])
+        or not observed.head(original.height).equals(original)
+        or not observed.slice(original.height).equals(expected)
+    ):
+        raise ValueError("Appended rows do not match the selected original rows")
+
+    try:
+        run(observed_path, lookup, execution, contract_version="v2")
+    except RuntimeError:
+        failures = list((execution / "data/failures").glob("*.json"))
+        if len(failures) != 1:
+            raise
+        record = json.loads(failures[0].read_text(encoding="utf-8"))
+        if (
+            record["error_type"] != SourceAuditMismatch.__name__
+            or record["status"] != "failed"
+            or record["current_run_id"] != clean["run_id"]
+            or record["staging_artifacts"]
+        ):
+            raise
+    else:
+        raise ValueError("The worker accepted a source that differs from the pinned audit")
+
+    if current.read_bytes() != before or {path.name for path in runs.iterdir()} != previous_runs:
+        raise ValueError("Source rejection changed published or staged runs")
+
+    evaluator = workspace / "evaluator"
+    evaluator.mkdir()
+    (evaluator / "ground_truth.ingestion.json").write_text(
+        json.dumps(asdict(truth), indent=2) + "\n", encoding="utf-8"
+    )
+    return {
+        "clean_run_id": clean["run_id"],
+        "failure_id": record["failure_id"],
+        "outcome": "rejected_at_source_audit",
+        "appended_rows": observed.height - original.height,
+        "current_run_id": record["current_run_id"],
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--lookup", type=Path, required=True)
+    parser.add_argument("--case", choices=("duplicate-lookup", "duplicate-ingestion"), default="duplicate-lookup")
     parser.add_argument("--severity", choices=("low", "medium", "high"), default="low")
     parser.add_argument("--seed", type=int, choices=(11, 29, 47), default=11)
     args = parser.parse_args()
-    result = run_lookup_case(
+    runner = run_ingestion_case if args.case == "duplicate-ingestion" else run_lookup_case
+    result = runner(
         args.repository.resolve(), args.workspace.resolve(), args.source.resolve(),
         args.lookup.resolve(), args.severity, args.seed,
     )

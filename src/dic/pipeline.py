@@ -233,6 +233,10 @@ def load_contract(root: Path, version: str = "v1") -> tuple[dict[str, Any], dict
     return contract, schema, contract_hash
 
 
+class SourceAuditMismatch(ValueError):
+    """A source file failed verification against its pinned identity."""
+
+
 def build_v2_source_provenance(root: Path, source_path: Path, month: str,
                                observed_columns: list[dict[str, str]], row_count: int) -> dict[str, Any]:
     """Validate an actual source file against the pinned M2a audit and return portable provenance."""
@@ -252,7 +256,9 @@ def build_v2_source_provenance(root: Path, source_path: Path, month: str,
     if (sha256(path) != record["sha256"] or path.stat().st_size != record["bytes"]
             or row_count != record["rows"] or observed_signature != record["schema_signature"]
             or observed_columns != expected_cohort["columns"]):
-        raise ValueError(f"Source bytes, row count, or physical schema differ from the pinned audit for {month}")
+        raise SourceAuditMismatch(
+            f"Source bytes, row count, or physical schema differ from the pinned audit for {month}"
+        )
     normalization = contract["normalization"]
     aliases = normalization["column_aliases"]
     canonical_by_fold = {name.casefold(): name for name in schema["columns"]}

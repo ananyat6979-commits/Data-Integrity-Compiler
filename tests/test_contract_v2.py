@@ -13,7 +13,7 @@ import polars as pl
 
 import dic.pipeline as pipeline
 from dic.pipeline import build_v2_source_provenance, load_contract, run
-from experiments.m2a.run_development_case import run_lookup_case
+from experiments.m2a.run_development_case import run_ingestion_case, run_lookup_case
 from experiments.m2a.verify_v2_run import verify_v2_run
 
 
@@ -315,6 +315,18 @@ def test_v2_subprocess_run_rejects_far_out_rows_without_blocking(
         assert original_pointer.read_bytes() == original
         with pytest.raises(FileExistsError):
             run_lookup_case(tmp_path, workspace, trips, lookup, "medium", 11)
+
+        ingestion = tmp_path / "ingestion-case"
+        rejected = run_ingestion_case(tmp_path, ingestion, trips, lookup, "low", 11)
+        assert rejected["outcome"] == "rejected_at_source_audit"
+        assert rejected["appended_rows"] == 1
+        assert rejected["current_run_id"] == rejected["clean_run_id"]
+        intake = ingestion / "execution"
+        failure = intake / "data/failures" / (rejected["failure_id"] + ".json")
+        assert json.loads(failure.read_text(encoding="utf-8"))["error_type"] == "SourceAuditMismatch"
+        assert list(intake.rglob("ground_truth*")) == []
+        assert (ingestion / "evaluator/ground_truth.ingestion.json").is_file()
+        assert original_pointer.read_bytes() == original
 
     lookup.write_text(
         "LocationID,Borough,Zone,service_zone\n1,Manhattan,Alpha,Yellow\n"
