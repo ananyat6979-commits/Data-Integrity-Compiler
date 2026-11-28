@@ -44,7 +44,7 @@
         29,
         47
       ],
-      "seed_policy": "Seeds 11, 29, and 47 select distinct eligible source-row ordinals after excluding already-selected ordinals; each run reuses its selection deterministically.",
+      "seed_policy": "Within each run, rank source row ordinals by SHA-256 of UTF-8 fault_id|seed|source_row_ordinal, then ordinal, and copy the first duplicate_rows rows. Different seeds may select overlapping rows. Persist selected ordinals only in evaluator ground truth.",
       "original_behavior": "The pipeline ingests the file as supplied; no primary-key constraint identifies exact duplicate trip rows.",
       "affected_scope": "Selected source rows, total ingested rows, and downstream row and fare totals.",
       "oracle": {
@@ -98,7 +98,7 @@
         29,
         47
       ],
-      "seed_policy": "Seeds 11, 29, and 47 determine a stable row-ordinal selection; selected counts are rounded up and recorded only in evaluator ground truth.",
+      "seed_policy": "Within each run, rank source row ordinals by SHA-256 of UTF-8 fault_id|seed|source_row_ordinal, then ordinal, and remove the first ceil(removed_fraction times source row count) rows. Different seeds may select overlapping rows. Persist selected ordinals only in evaluator ground truth.",
       "original_behavior": "The pipeline processes all rows physically present in its input and has no declared expected month row count.",
       "affected_scope": "Selected row ordinals, ingested count, fare sums, and downstream partitions containing removed rows.",
       "oracle": {
@@ -138,13 +138,16 @@
       "mechanism": "Replace the declared nonnegative fare filter with a stricter lower threshold for a seeded subset of rows.",
       "severity_parameters": {
         "low": {
-          "threshold": 1.0
+          "threshold": 1.0,
+          "selected_fraction": 0.01
         },
         "medium": {
-          "threshold": 5.0
+          "threshold": 5.0,
+          "selected_fraction": 0.1
         },
         "high": {
-          "threshold": 20.0
+          "threshold": 20.0,
+          "selected_fraction": 0.5
         }
       },
       "seeds": [
@@ -152,7 +155,7 @@
         29,
         47
       ],
-      "seed_policy": "Seeds choose disjoint row-ordinal subsets from rows whose fare lies between zero and the threshold; exact selections are evaluator-only.",
+      "seed_policy": "Within each run, candidates are rows with 0 <= fare_amount < threshold. Select ceil(selected_fraction times candidate count) candidates without replacement, ranked by SHA-256 of UTF-8 fault_id|seed|source_row_ordinal, then ordinal. Persist selected ordinals only in evaluator ground truth.",
       "original_behavior": "The contract retains every parseable row with fare_amount greater than or equal to zero.",
       "affected_scope": "Rows in the selected fare interval and their counts and fare totals by date and pickup zone.",
       "oracle": {
@@ -210,7 +213,7 @@
         29,
         47
       ],
-      "seed_policy": "Seeds 11, 29, and 47 select rows by stable source ordinal; selected timestamps are adjusted by the stated signed offset, fixed positive for this catalog version.",
+      "seed_policy": "Select ceil(selected_fraction times row count) source ordinals by ascending SHA-256 of UTF-8 fault_id|seed|source_row_ordinal, then ordinal. Different seeds may select overlapping rows. Add the stated positive shift_minutes to selected pickup timestamps. Persist selected ordinals only in evaluator ground truth.",
       "original_behavior": "The pipeline preserves source-local timestamp values and groups using the documented TLC local service date; it does not apply an undocumented UTC conversion.",
       "affected_scope": "Selected pickup timestamps, service-date assignment near day boundaries, and date-zone aggregates.",
       "oracle": {
@@ -265,7 +268,7 @@
         29,
         47
       ],
-      "seed_policy": "Seeds choose an existing location key with at least one matching trip; key selection is deterministic and evaluator-only.",
+      "seed_policy": "Sort distinct non-null lookup LocationID values that match at least one trip PULocationID. Rank them by SHA-256 of UTF-8 fault_id|seed|candidate_index, then candidate_index, and duplicate the first key. Persist the selected key only in evaluator ground truth.",
       "original_behavior": "The many-to-one join requires unique lookup keys and blocks on duplicate lookup keys.",
       "affected_scope": "One lookup key and all matching trip rows, joined row counts, and affected daily-zone aggregates.",
       "oracle": {
@@ -320,7 +323,7 @@
         29,
         47
       ],
-      "seed_policy": "Seeds select stable source-row ordinals and are repeated exactly; the altered key and selected rows remain evaluator-only.",
+      "seed_policy": "Among rows with PULocationID different from DOLocationID, select ceil(selected_fraction times eligible row count) by ascending SHA-256 of UTF-8 fault_id|seed|source_row_ordinal, then ordinal. Different seeds may select overlapping rows. Persist selected ordinals only in evaluator ground truth.",
       "original_behavior": "Each trip is enriched using PULocationID against lookup LocationID.",
       "affected_scope": "Selected trips with differing pickup and dropoff zone IDs and their enriched attributes.",
       "oracle": {
@@ -375,7 +378,7 @@
         29,
         47
       ],
-      "seed_policy": "Seeds select groups in stable sorted key order; group assignment is recorded only in evaluator ground truth.",
+      "seed_policy": "Sort groups by their canonical compact JSON key tuple, then rank by SHA-256 of UTF-8 fault_id|seed|group_key_json and group_key_json. Replace the mean for the first ceil(affected_group_fraction times group count) ranked groups. Persist selected keys only in evaluator ground truth.",
       "original_behavior": "The aggregate reports total fare as an exact decimal sum per service date and pickup zone.",
       "affected_scope": "Selected daily-zone groups; row counts can remain unchanged while numeric totals are wrong.",
       "oracle": {
@@ -429,7 +432,7 @@
         29,
         47
       ],
-      "seed_policy": "Seeds select stable source-row ordinals that cross a calendar-day boundary; exact selection is evaluator-only.",
+      "seed_policy": "Among rows whose pickup_date differs from dropoff_date, select ceil(selected_row_fraction times eligible row count) by ascending SHA-256 of UTF-8 fault_id|seed|source_row_ordinal, then ordinal. Different seeds may select overlapping rows. Use dropoff_date for those rows during grouping. Persist selected ordinals only in evaluator ground truth.",
       "original_behavior": "Daily-zone metrics are grouped by pickup service date and pickup zone.",
       "affected_scope": "Selected cross-midnight trips, date-zone group membership, and associated counts and fare totals.",
       "oracle": {

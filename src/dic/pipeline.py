@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -41,6 +41,12 @@ def _contract_file_sha256(path: Path) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def _normalized_json_sha256(path: Path) -> str:
+    """Hash UTF-8 JSON after newline normalization for a platform-stable audit pin."""
+    content = path.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
 def canonical_hash(rows: list[tuple[Any, ...]]) -> str:
     def norm(v: Any) -> Any:
         if v is None:
@@ -59,10 +65,13 @@ def connect() -> duckdb.DuckDBPyConnection:
     return duckdb.connect(":memory:")
 
 
-def load_contract(root: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
-    contract_dir = root / "contracts"
-    if not contract_dir.is_dir():
-        contract_dir = Path(__file__).parents[2] / "contracts"
+def load_contract(root: Path, version: str = "v1") -> tuple[dict[str, Any], dict[str, Any], str]:
+    if version not in {"v1", "v2"}:
+        raise ValueError(f"Unsupported contract version: {version}")
+    contracts_root = root / "contracts"
+    if not contracts_root.is_dir():
+        contracts_root = Path(__file__).parents[2] / "contracts"
+    contract_dir = contracts_root if version == "v1" else contracts_root / version
     yaml_path = contract_dir / "pipeline.yaml"
     if not yaml_path.is_file():
         raise ValueError(f"Missing required pipeline contract: {yaml_path}")
@@ -83,6 +92,79 @@ def load_contract(root: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
         raise ValueError("Referenced schema required_columns must be declared in columns")
     if not isinstance(schema.get("compatible_additions"), list) or not isinstance(schema.get("schema_contract"), str):
         raise ValueError("Referenced schema must define schema_contract and compatible_additions")
+    if version == "v2":
+        audit_ref = contract.get("source_audit")
+        required_audit_fields = {"path", "sha256", "sha256_method", "audit_version", "months"}
+        if not isinstance(audit_ref, dict) or not required_audit_fields <= audit_ref.keys():
+            raise ValueError("Contract v2 source_audit settings are incomplete")
+        if audit_ref["sha256_method"] != "utf8_lf_normalized":
+            raise ValueError("Contract v2 source_audit.sha256_method is unsupported")
+        audit_path = (root / str(audit_ref["path"])).resolve()
+        repository_root = root.resolve()
+        if repository_root not in audit_path.parents or not audit_path.is_file():
+            raise ValueError("Contract v2 source_audit.path must reference an existing file inside the repository")
+        observed_audit_hash = _normalized_json_sha256(audit_path)
+        if observed_audit_hash != audit_ref["sha256"]:
+            raise ValueError("Contract v2 source audit SHA-256 does not match the pinned digest")
+        audit = json.loads(audit_path.read_text(encoding="utf-8"))
+        if audit.get("audit_version") != audit_ref["audit_version"]:
+            raise ValueError("Contract v2 source audit version does not match the pinned version")
+        audit_months = audit.get("months")
+        expected_months = audit_ref["months"]
+        if not isinstance(audit_months, list) or not isinstance(expected_months, list):
+            raise ValueError("Contract v2 source audit must declare month records and expected months")
+        observed_months = [item.get("month") for item in audit_months if isinstance(item, dict)]
+        if observed_months != expected_months or len(set(observed_months)) != len(expected_months):
+            raise ValueError("Contract v2 source audit month inventory is incomplete, duplicated, or out of order")
+        cohorts = audit.get("cohorts")
+        if not isinstance(cohorts, list) or not cohorts:
+            raise ValueError("Contract v2 source audit must define schema cohorts")
+        cohort_by_id = {item.get("cohort_id"): item for item in cohorts if isinstance(item, dict)}
+        cohort_months = [month for item in cohorts for month in item.get("months", [])]
+        if (len(cohort_by_id) != len(cohorts) or sorted(cohort_months) != sorted(expected_months)
+                or len(cohort_months) != len(set(cohort_months))):
+            raise ValueError("Contract v2 audit cohorts must cover each expected month exactly once")
+        for cohort in cohorts:
+            signature = hashlib.sha256(json.dumps(
+                cohort["columns"], sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            if signature != cohort.get("signature") or len(cohort["columns"]) != cohort.get("column_count"):
+                raise ValueError(f"Contract v2 audit cohort {cohort.get('cohort_id')} has invalid schema evidence")
+        for record in audit_months:
+            cohort = cohort_by_id.get(record.get("cohort_id"))
+            if (cohort is None or record["month"] not in cohort["months"]
+                    or record.get("schema_signature") != cohort["signature"]
+                    or record.get("file") != f"yellow_tripdata_{record['month']}.parquet"
+                    or not isinstance(record.get("sha256"), str) or len(record["sha256"]) != 64):
+                raise ValueError(f"Contract v2 audit record is inconsistent for {record.get('month')}")
+        normalization = contract.get("normalization")
+        if not isinstance(normalization, dict) or not {"column_name_case", "column_aliases", "source_type_map"} <= normalization.keys():
+            raise ValueError("Contract v2 normalization settings are incomplete")
+        if normalization["column_name_case"] != "case_insensitive":
+            raise ValueError("Contract v2 column_name_case must be case_insensitive")
+        aliases = normalization["column_aliases"]
+        type_map = normalization["source_type_map"]
+        if not isinstance(aliases, dict) or not isinstance(type_map, dict):
+            raise ValueError("Contract v2 normalization aliases and source_type_map must be mappings")
+        canonical_by_fold = {name.casefold(): name for name in schema["columns"]}
+        for cohort in audit.get("cohorts", []):
+            mapped_names = []
+            for item in cohort.get("columns", []):
+                source_name = item["name"]
+                canonical_name = aliases.get(source_name, canonical_by_fold.get(source_name.casefold()))
+                if canonical_name not in schema["columns"]:
+                    raise ValueError(f"Contract v2 does not map source column {source_name} in {cohort.get('cohort_id')}")
+                mapped_names.append(canonical_name)
+                allowed_source_types = type_map.get(canonical_name)
+                if not isinstance(allowed_source_types, list) or item["type"] not in allowed_source_types:
+                    raise ValueError(f"Contract v2 has no physical type mapping for {source_name} ({item['type']})")
+            if len(mapped_names) != len(set(mapped_names)):
+                raise ValueError(f"Contract v2 normalization merges source columns in {cohort.get('cohort_id')}")
+            if not set(schema["required_columns"]) <= set(mapped_names):
+                raise ValueError(f"Contract v2 source cohort {cohort.get('cohort_id')} lacks required semantic columns")
+            if len(cohort.get("columns", [])) != cohort.get("column_count"):
+                raise ValueError(f"Contract v2 source cohort {cohort.get('cohort_id')} has an invalid column count")
+        if set(type_map) != set(schema["columns"]):
+            raise ValueError("Contract v2 source_type_map must declare every semantic schema column")
     schema_policy_fields = {"added_optional_columns", "unrecognized_added_columns", "removed_optional_columns", "missing_required_columns"}
     policy = contract["schema_policy"]
     if not isinstance(policy, dict) or not schema_policy_fields <= policy.keys():
@@ -130,10 +212,80 @@ def load_contract(root: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
         raise ValueError("join.unmatched_policy must be exclude or block")
     if not isinstance(join["key_non_null"], bool):
         raise ValueError("join.key_non_null must be a boolean")
+    if version == "v2":
+        coverage = contract.get("date_coverage")
+        if not isinstance(coverage, dict) or not {"rule_id", "lower_offset_days", "upper_offset_days", "upper_bound"} <= coverage.keys():
+            raise ValueError("Contract v2 date_coverage settings are incomplete")
+        if (coverage["rule_id"] != "far_out_pickup" or coverage["lower_offset_days"] != -1
+                or coverage["upper_offset_days"] != 1 or coverage["upper_bound"] != "exclusive"
+                or coverage.get("handling") != "reject_row_and_count_without_alert"):
+            raise ValueError("Contract v2 date_coverage must use the declared one-day half-open window")
+        evaluation = contract.get("evaluation")
+        if not isinstance(evaluation, dict) or not {"exact_month_range", "distribution_month_range", "regime_boundary_month"} <= evaluation.keys():
+            raise ValueError("Contract v2 evaluation settings are incomplete")
+        if (evaluation["exact_month_range"] != ["2023-01", "2025-12"]
+                or evaluation["distribution_month_range"] != ["2023-01", "2024-12"]
+                or evaluation["regime_boundary_month"] != "2025-01"):
+            raise ValueError("Contract v2 evaluation ranges must preserve the declared 36 and 24 month denominators")
     hash_payload = {"pipeline.yaml": _contract_file_sha256(yaml_path),
                     "schema": _contract_file_sha256(schema_path)}
     contract_hash = hashlib.sha256(json.dumps(hash_payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return contract, schema, contract_hash
+
+
+class SourceAuditMismatch(ValueError):
+    """A source file failed verification against its pinned identity."""
+
+
+def build_v2_source_provenance(root: Path, source_path: Path, month: str,
+                               observed_columns: list[dict[str, str]], row_count: int) -> dict[str, Any]:
+    """Validate an actual source file against the pinned M2a audit and return portable provenance."""
+    contract, schema, _ = load_contract(root, version="v2")
+    source_audit = contract["source_audit"]
+    audit_path = root / source_audit["path"]
+    audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    record = next((item for item in audit["months"] if item["month"] == month), None)
+    if record is None:
+        raise ValueError(f"Source month {month} is not included in the pinned M2a audit")
+    path = source_path.resolve()
+    if path.name != record["file"] or not path.is_file():
+        raise ValueError(f"Source path must identify the audited file {record['file']}")
+    observed_signature = hashlib.sha256(json.dumps(
+        observed_columns, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    expected_cohort = next(item for item in audit["cohorts"] if item["cohort_id"] == record["cohort_id"])
+    if (sha256(path) != record["sha256"] or path.stat().st_size != record["bytes"]
+            or row_count != record["rows"] or observed_signature != record["schema_signature"]
+            or observed_columns != expected_cohort["columns"]):
+        raise SourceAuditMismatch(
+            f"Source bytes, row count, or physical schema differ from the pinned audit for {month}"
+        )
+    normalization = contract["normalization"]
+    aliases = normalization["column_aliases"]
+    canonical_by_fold = {name.casefold(): name for name in schema["columns"]}
+    mappings = []
+    normalized_columns = []
+    for item in observed_columns:
+        canonical_name = aliases.get(item["name"], canonical_by_fold.get(item["name"].casefold()))
+        if canonical_name is None:
+            raise ValueError(f"No semantic column mapping exists for {item['name']}")
+        mappings.append({"source_name": item["name"], "source_type": item["type"],
+                         "semantic_name": canonical_name, "semantic_type": schema["columns"][canonical_name]})
+        normalized_columns.append({"name": canonical_name, "type": schema["columns"][canonical_name]})
+    return {
+        "contract_version": 2,
+        "source_month": month,
+        "logical_source_name": record["file"],
+        "source_sha256": record["sha256"],
+        "source_bytes": record["bytes"],
+        "source_rows": record["rows"],
+        "audit": {"version": source_audit["audit_version"], "path": source_audit["path"],
+                  "sha256": source_audit["sha256"], "cohort_id": record["cohort_id"],
+                  "schema_signature": record["schema_signature"]},
+        "original_columns": observed_columns,
+        "semantic_schema_id": schema["schema_contract"],
+        "normalized_columns": normalized_columns,
+        "column_mapping": mappings,
+    }
 
 
 def _quote_identifier(identifier: str) -> str:
@@ -279,12 +431,25 @@ def _rows(con: duckdb.DuckDBPyConnection, query: str) -> list[tuple[Any, ...]]:
     return con.execute(query).fetchall()
 
 
+# The v2 oracle rounds the exact mean half away from zero at six decimal places.
+# Keep the numerator in integer millionths until the final decimal conversion.
+_V2_FARE_AVERAGE = """(
+    sign(sum(fare_decimal)) * (
+        ((abs(sum(fare_decimal)) * 1000000)::HUGEINT + count(fare_decimal) // 2)
+        // nullif(count(fare_decimal), 0)
+    ) * 0.000001::DECIMAL(7,6)
+)::DECIMAL(18,6)"""
+_V1_FARE_AVERAGE = "avg(fare_decimal)::DECIMAL(18,6)"
+
+
 def run(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = None,
-       reference_lookup: Path | None = None, _test_failpoint: str | None = None) -> dict[str, Any]:
+       reference_lookup: Path | None = None, _test_failpoint: str | None = None,
+       contract_version: str = "v1", *, _development_override: dict | None = None) -> dict[str, Any]:
     args = {"trips_path": str(trips_path.resolve()), "lookup_path": str(lookup_path.resolve()),
             "root": str(root.resolve()), "fault_id": fault_id,
             "reference_lookup": str(reference_lookup.resolve()) if reference_lookup else None,
-            "test_failpoint": _test_failpoint}
+            "test_failpoint": _test_failpoint, "contract_version": contract_version,
+            "development_override": _development_override}
     completed = subprocess.run([sys.executable, "-m", "dic.worker"], input=json.dumps(args),
                                text=True, capture_output=True, cwd=root)
     if completed.returncode:
@@ -296,9 +461,24 @@ def run(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = 
 
 
 def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: str | None = None,
-                   reference_lookup: Path | None = None, test_failpoint: str | None = None) -> dict[str, Any]:
+                   reference_lookup: Path | None = None, test_failpoint: str | None = None,
+                   contract_version: str = "v1", *, development_override: dict | None = None) -> dict[str, Any]:
+    override_stage = None
+    selected = []
+    if development_override is not None:
+        if contract_version != "v2" or set(development_override) != {"stage", "selected"}:
+            raise ValueError("Invalid v2 development override")
+        override_stage = development_override["stage"]
+        selected = development_override["selected"]
+        if (
+            not isinstance(selected, list) or not selected
+            or (override_stage == "cleaning" and not all(type(i) is int and i >= 0 for i in selected))
+            or (override_stage == "aggregation" and not all(isinstance(i, str) for i in selected))
+            or override_stage not in {"cleaning", "aggregation"}
+        ):
+            raise ValueError("Invalid v2 development selection")
     started = time.perf_counter()
-    contract, schema_contract, contract_hash = load_contract(root)
+    contract, schema_contract, contract_hash = load_contract(root, version=contract_version)
     contract_id = contract["contract_id"]
     run_id = uuid.uuid4().hex
     runs = root / "data" / "runs"
@@ -307,7 +487,33 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
     con = connect()
     trips_sql = trips_path.resolve().as_posix().replace("'", "''")
     input_hash = sha256(trips_path)
-    con.execute(f"CREATE VIEW raw AS SELECT *, '{input_hash}'::VARCHAR AS source_sha256, file_row_number AS source_row_ordinal FROM read_parquet('{trips_sql}', file_row_number=true)")
+    physical_schema = [
+        {"name": row[0], "type": str(row[1])}
+        for row in con.execute(f"DESCRIBE SELECT * FROM read_parquet('{trips_sql}')").fetchall()
+    ]
+    source_provenance = None
+    source_month = None
+    lower_bound = upper_bound = None
+    if contract_version == "v2":
+        source_month_match = re.fullmatch(r"yellow_tripdata_(\d{4}-\d{2})\.parquet", trips_path.name)
+        if source_month_match is None:
+            raise ValueError("Contract v2 runs require a source named yellow_tripdata_YYYY-MM.parquet")
+        source_month = source_month_match.group(1)
+        source_rows = int(con.execute(f"SELECT count(*) FROM read_parquet('{trips_sql}')").fetchone()[0])
+        source_provenance = build_v2_source_provenance(root, trips_path, source_month, physical_schema, source_rows)
+        aliases = contract["normalization"]["column_aliases"]
+        canonical_by_fold = {name.casefold(): name for name in schema_contract["columns"]}
+        projection = []
+        for item in physical_schema:
+            source_name = item["name"]
+            semantic_name = aliases.get(source_name, canonical_by_fold.get(source_name.casefold()))
+            if semantic_name is None:
+                raise ValueError(f"Contract v2 cannot normalize source column {source_name}")
+            projection.append(f"{_quote_identifier(source_name)} AS {_quote_identifier(semantic_name)}")
+        raw_projection = ", ".join(projection)
+        con.execute(f"CREATE VIEW raw AS SELECT {raw_projection}, '{input_hash}'::VARCHAR AS source_sha256, file_row_number AS source_row_ordinal FROM read_parquet('{trips_sql}', file_row_number=true)")
+    else:
+        con.execute(f"CREATE VIEW raw AS SELECT *, '{input_hash}'::VARCHAR AS source_sha256, file_row_number AS source_row_ordinal FROM read_parquet('{trips_sql}', file_row_number=true)")
     cols = {x[0] for x in con.execute("DESCRIBE raw").fetchall()}
     missing = set(schema_contract["required_columns"]) - cols
     if missing:
@@ -315,10 +521,31 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
     join_key = contract["join"]["key"]
     if join_key not in cols:
         raise ValueError(f"Configured join key {join_key} is absent from the input schema")
-    predicates, params = zip(*[_compile_rule(rule) for rule in contract["cleaning"]["rules"]])
+    cleaning_rules = list(contract["cleaning"]["rules"])
+    compiled_rules = [_compile_rule(rule) for rule in cleaning_rules]
+    if contract_version == "v2":
+        date_rule = contract["date_coverage"]
+        date_rule_id = date_rule["rule_id"]
+        if any(rule["id"] == date_rule_id for rule in cleaning_rules):
+            raise ValueError(f"Contract v2 date rule ID duplicates a cleaning rule: {date_rule_id}")
+        month_start = datetime.strptime(source_month + "-01", "%Y-%m-%d")
+        lower_bound = month_start + timedelta(days=date_rule["lower_offset_days"])
+        if month_start.month == 12:
+            next_month_start = month_start.replace(year=month_start.year + 1, month=1)
+        else:
+            next_month_start = month_start.replace(month=month_start.month + 1)
+        upper_bound = next_month_start + timedelta(days=date_rule["upper_offset_days"])
+        pickup_ts = f"try_cast({_quote_identifier('tpep_pickup_datetime')} AS TIMESTAMP)"
+        date_predicate = f"{pickup_ts} >= ? AND {pickup_ts} < ?"
+        cleaning_rules.append({"id": date_rule_id, "column": "tpep_pickup_datetime", "operator": "date_window"})
+        compiled_rules.append((date_predicate, [lower_bound, upper_bound]))
+    predicates, params = zip(*compiled_rules)
     failed_case_parts = []
     case_params: list[Any] = []
-    for rule, (predicate, rule_params) in zip(contract["cleaning"]["rules"], zip(predicates, params)):
+    for rule, (predicate, rule_params) in zip(cleaning_rules, zip(predicates, params)):
+        if override_stage == "cleaning" and rule["id"] == "nonnegative_fare":
+            predicate = f"({predicate}) AND NOT contains(?::BIGINT[], source_row_ordinal)"
+            rule_params = [*rule_params, selected]
         failed_case_parts.append(f"WHEN NOT ({predicate}) THEN ?")
         case_params.extend(rule_params)
         case_params.append(rule["id"])
@@ -331,7 +558,7 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
     con.execute(f"CREATE TEMP TABLE assessed AS SELECT *, {first_failure_sql} AS first_failed_rule FROM ({clean_select}) clean_source", case_params)
     con.execute("CREATE TEMP VIEW clean AS SELECT * FROM assessed WHERE first_failed_rule IS NULL")
     rejected_by_rule = {rule_id: count for rule_id, count in con.execute("SELECT first_failed_rule, count(*) FROM assessed WHERE first_failed_rule IS NOT NULL GROUP BY 1").fetchall()}
-    rejected_by_rule = {rule["id"]: int(rejected_by_rule.get(rule["id"], 0)) for rule in contract["cleaning"]["rules"]}
+    rejected_by_rule = {rule["id"]: int(rejected_by_rule.get(rule["id"], 0)) for rule in cleaning_rules}
     clean_n = con.execute("SELECT count(*) FROM clean").fetchone()[0]
     raw_n = con.execute("SELECT count(*) FROM raw").fetchone()[0]
     if raw_n - clean_n != sum(rejected_by_rule.values()):
@@ -393,17 +620,32 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
         bool(null_join_rows) and join_settings["key_non_null"],
     ]
     contract_failed = any(blocking_failures)
-    deltas = _aggregate_deltas(con, duplicates)
+    fare_average = _V2_FARE_AVERAGE if contract_version == "v2" else _V1_FARE_AVERAGE
+    deltas = _aggregate_deltas(con, duplicates, fare_average)
     validation_seconds = time.perf_counter() - validation_started
     current_path = root / "data" / "published" / "CURRENT"
     pointer_before = json.loads(current_path.read_text(encoding="utf8")).get("run_id") if current_path.exists() else None
     con.execute("""CREATE TABLE trip_enriched AS SELECT * FROM diagnostic WHERE matched_key IS NOT NULL
       AND NOT ?""", [contract_failed])
     # If blocked, keep a candidate for evidence only; no promotion occurs below.
-    con.execute("""CREATE TABLE daily_zone_metrics AS SELECT pickup_date, pickup_zone,
-      count(*)::BIGINT AS trip_count, sum(fare_decimal)::DECIMAL(18,2) AS revenue,
-      avg(fare_decimal)::DECIMAL(18,6) AS average_fare
-      FROM diagnostic WHERE matched_key IS NOT NULL GROUP BY 1,2 ORDER BY 1,2""")
+    revenue = "sum(fare_decimal)::DECIMAL(18,2)"
+    revenue_params = []
+    if override_stage == "aggregation":
+        cents = "(abs(sum(fare_decimal)) * 100)::HUGEINT"
+        count = "count(fare_decimal)"
+        mean_at_cents = (
+            f"(sign(sum(fare_decimal)) * (({cents} + {count} // 2) // nullif({count}, 0))"
+            " * 0.01::DECIMAL(3,2))::DECIMAL(18,2)"
+        )
+        revenue = (
+            "CASE WHEN contains(?::VARCHAR[], concat(pickup_date, '|', pickup_zone)) "
+            f"THEN {mean_at_cents} ELSE {revenue} END"
+        )
+        revenue_params = [selected]
+    con.execute(f"""CREATE TABLE daily_zone_metrics AS SELECT pickup_date, pickup_zone,
+      count(*)::BIGINT AS trip_count, {revenue} AS revenue,
+      {fare_average} AS average_fare
+      FROM diagnostic WHERE matched_key IS NOT NULL GROUP BY 1,2 ORDER BY 1,2""", revenue_params)
     # Stream stage outputs to Parquet inside DuckDB (no Python-side row materialization) and compute
     # an order-independent logical hash per table: row count + sum of per-row value hashes.
     # Values (decimals, nulls, dates) are hashed as values, never as file bytes.
@@ -459,6 +701,17 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
       "versions":{"compiler":__version__,"python":platform.python_version(),"duckdb":duckdb.__version__,"contract":str(contract["contract_version"]),"cleaning":str(contract["cleaning"]["version"])},
       "row_counts":{**counts,"enriched_candidate_rows":con.execute("SELECT count(*) FROM trip_enriched").fetchone()[0]},
       "logical_output_hashes":outputs}
+    if contract_version == "v2":
+        report["source_month"] = source_month
+        report["source_provenance"] = source_provenance
+        report["date_coverage"] = {
+            "rule_id": contract["date_coverage"]["rule_id"],
+            "lower_bound_inclusive": lower_bound.isoformat(sep=" "),
+            "upper_bound_exclusive": upper_bound.isoformat(sep=" "),
+            "handling": contract["date_coverage"]["handling"],
+            "rejected_rows": rejected_by_rule[contract["date_coverage"]["rule_id"]],
+            "alerts": 0,
+        }
     validate_report(report)
     manifest = {"manifest_version": "dic-manifest-v1", "run_id": run_id,
                 "inputs": {"trips_sha256": input_hash, "lookup_sha256": sha256(lookup_path),
@@ -467,6 +720,9 @@ def run_in_process(trips_path: Path, lookup_path: Path, root: Path, fault_id: st
                 "contract_version": contract["contract_version"], "contract_sha256": contract_hash,
                 "configuration_version": "pipeline-v2", "row_counts": counts,
                 "logical_output_hashes": outputs}
+    if contract_version == "v2":
+        manifest["source_month"] = source_month
+        manifest["source_provenance"] = source_provenance
     _write_json(stage / "manifest.json", manifest)
     _write_json(stage / "report.json", report)
     if not contract_failed:
@@ -647,22 +903,23 @@ def _publish_impl(stage: Path, published: Path, run_id: str, report: dict[str, A
     candidate.unlink(missing_ok=True)
 
 
-def _aggregate_deltas(con: duckdb.DuckDBPyConnection, duplicate_keys: dict[str, int]) -> list[dict[str, Any]]:
+def _aggregate_deltas(con: duckdb.DuckDBPyConnection, duplicate_keys: dict[str, int],
+                      fare_average: str = _V1_FARE_AVERAGE) -> list[dict[str, Any]]:
     """Compare observed fanout to a one-row-per-key reference without reading injector ground truth."""
     if not duplicate_keys:
         return []
-    rows = con.execute("""WITH one_lookup AS (
+    rows = con.execute(f"""WITH one_lookup AS (
         SELECT *, row_number() OVER (PARTITION BY lookup_zone ORDER BY Zone, Borough) AS rn FROM lookup
       ), clean_metrics AS (
         SELECT c.pickup_date, c.pickup_zone, count(*)::BIGINT AS trips,
           sum(c.fare_decimal)::DECIMAL(18,2) AS revenue,
-          avg(c.fare_decimal)::DECIMAL(18,6) AS avg_fare
+          {fare_average} AS avg_fare
         FROM clean c JOIN one_lookup l ON c.pickup_zone=l.lookup_zone AND l.rn=1
         GROUP BY 1,2
       ), observed_metrics AS (
         SELECT pickup_date, pickup_zone, count(*)::BIGINT AS trips,
           sum(fare_decimal)::DECIMAL(18,2) AS revenue,
-          avg(fare_decimal)::DECIMAL(18,6) AS avg_fare
+          {fare_average} AS avg_fare
         FROM diagnostic WHERE matched_key IS NOT NULL GROUP BY 1,2
       )
       SELECT coalesce(o.pickup_date,c.pickup_date), coalesce(o.pickup_zone,c.pickup_zone),

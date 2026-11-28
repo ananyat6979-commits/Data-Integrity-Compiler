@@ -1,0 +1,493 @@
+{
+  "audit_sha256": "b3c90659cf8bfd1044afcc6a514c5009f9988f6efb5696673e6f900143740471",
+  "audit_sha256_method": "utf8_lf_normalized",
+  "contract_id": "dic-taxi-pipeline-v2",
+  "contract_sha256": "d71f1a09eba4d2260700f6afb10f8a244c5f3c566c579c4a36c1106962d0dc3e",
+  "contract_version": 2,
+  "entries": [
+    {
+      "bytes": 38139949,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-01.parquet",
+      "month": "2022-01",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 2463931,
+      "source_sha256": "797d6f008e67c3e3371b7f957ab97dbc2b38a9fb0ac083cb5eae4b0297b32372",
+      "status": "validated"
+    },
+    {
+      "bytes": 45616512,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-02.parquet",
+      "month": "2022-02",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 2979431,
+      "source_sha256": "9905ead83ac16ae4a2915cb44ab1edb9c53eb3ac5a77a71f2a2e3ba18d59efb4",
+      "status": "validated"
+    },
+    {
+      "bytes": 55682369,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-03.parquet",
+      "month": "2022-03",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 3627882,
+      "source_sha256": "b8b63566178c65da758cc292338ebc308534eb57607085fc67b2c939ae6035e3",
+      "status": "validated"
+    },
+    {
+      "bytes": 55222692,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-04.parquet",
+      "month": "2022-04",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 3599920,
+      "source_sha256": "8c4162f28244098bd40f150f5f639cc1f41673e0f0df47e6399d7d374c224049",
+      "status": "validated"
+    },
+    {
+      "bytes": 55558821,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-05.parquet",
+      "month": "2022-05",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 3588295,
+      "source_sha256": "6946b56ee057b72dced2204e0c10f2be2e1b7358c5b2c2943f88d2310089c43c",
+      "status": "validated"
+    },
+    {
+      "bytes": 55365184,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-06.parquet",
+      "month": "2022-06",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 3558124,
+      "source_sha256": "a08f27ea544a500a6e10637605e5906e246e2836435ba1c05a3a3521faf42389",
+      "status": "validated"
+    },
+    {
+      "bytes": 49367712,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-07.parquet",
+      "month": "2022-07",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 3174394,
+      "source_sha256": "5aa3c2a9deb55f09527e76e6f94a8185a4a04cd6361c8082ff6d6e64ab817d5b",
+      "status": "validated"
+    },
+    {
+      "bytes": 49717159,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-08.parquet",
+      "month": "2022-08",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 3152677,
+      "source_sha256": "7c2d8f6ad71d3b0e432a77553224ea69f473d0b8bdff24a5b11d289ac5388536",
+      "status": "validated"
+    },
+    {
+      "bytes": 49619957,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-09.parquet",
+      "month": "2022-09",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 3183767,
+      "source_sha256": "1ce6af91b4eb1583d3e710fec414c0aedddec96517b309506e7d12c3de72bb02",
+      "status": "validated"
+    },
+    {
+      "bytes": 57061938,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-10.parquet",
+      "month": "2022-10",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 3675411,
+      "source_sha256": "3f3cab00e7d236735d3ab227e54ffe48fd28b0afbb30ae90d843d7a065a3ae69",
+      "status": "validated"
+    },
+    {
+      "bytes": 50106631,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-11.parquet",
+      "month": "2022-11",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 3252717,
+      "source_sha256": "bf9fc6cd403320f2d00c2672fe1d4d58594c56ed7f64ab9bc7021d4c12bb543c",
+      "status": "validated"
+    },
+    {
+      "bytes": 53640739,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2022-12.parquet",
+      "month": "2022-12",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 3399549,
+      "source_sha256": "4a9a69306bd36547b2eed3ecfa7365b53c2872f45b9647834dbd5166dee93708",
+      "status": "validated"
+    },
+    {
+      "bytes": 47673370,
+      "cohort_id": "C1",
+      "file": "yellow_tripdata_2023-01.parquet",
+      "month": "2023-01",
+      "physical_schema_sha256": "1e6793ff6e1539befdf7a9490530e4298ce7223c15e45a08407f904804cb618e",
+      "rows": 3066766,
+      "source_sha256": "32df6f67578fa86c484a6b5ef23a5281992ff085521082340b0f9e5889e9a572",
+      "status": "validated"
+    },
+    {
+      "bytes": 47748012,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2023-02.parquet",
+      "month": "2023-02",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 2913955,
+      "source_sha256": "4809e6aaac64f05a62d16a25d55713be1537ad64fc261e895eaf2d2120fe750a",
+      "status": "validated"
+    },
+    {
+      "bytes": 56127762,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2023-03.parquet",
+      "month": "2023-03",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3403766,
+      "source_sha256": "e7d44943111b007bf0e7084863511886e0db29f862f9a96239383a1f86c6c26e",
+      "status": "validated"
+    },
+    {
+      "bytes": 54222699,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2023-04.parquet",
+      "month": "2023-04",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3288250,
+      "source_sha256": "95c01c53c865e06489179bdecce3a59603697a1557c4d5d183c20ae13a144dc6",
+      "status": "validated"
+    },
+    {
+      "bytes": 58654627,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2023-05.parquet",
+      "month": "2023-05",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3513649,
+      "source_sha256": "9bd7d1c557bb9d0413619ba296b4828b884852a70bd07f2230b83f080d9a8591",
+      "status": "validated"
+    },
+    {
+      "bytes": 54999465,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2023-06.parquet",
+      "month": "2023-06",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3307234,
+      "source_sha256": "3e60e29b5df45683948b68acbfb503aa459d14162c610622585c6580fdbfc73a",
+      "status": "validated"
+    },
+    {
+      "bytes": 48361828,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2023-07.parquet",
+      "month": "2023-07",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 2907108,
+      "source_sha256": "98504ae351d920e9e0b61241f5707f90ee1588cfb199c378459234b5035805ab",
+      "status": "validated"
+    },
+    {
+      "bytes": 48152353,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2023-08.parquet",
+      "month": "2023-08",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 2824209,
+      "source_sha256": "84ce36a2f84fa14c12fd976c79a7d4f30c871f1782b08ca7c27bb76ab946e66b",
+      "status": "validated"
+    },
+    {
+      "bytes": 47895515,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2023-09.parquet",
+      "month": "2023-09",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 2846722,
+      "source_sha256": "091bf156bea5bb10bd217f5f12375f966f8789349af45d5ee4153e3e1e077a87",
+      "status": "validated"
+    },
+    {
+      "bytes": 59009059,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2023-10.parquet",
+      "month": "2023-10",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3522285,
+      "source_sha256": "dc5f069476d350df802ed8120f3b39ec321c34cfa905381e87f608c78ca0c645",
+      "status": "validated"
+    },
+    {
+      "bytes": 56094653,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2023-11.parquet",
+      "month": "2023-11",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3339715,
+      "source_sha256": "af203de0e73a92d640121f02a34326f25037d62380fc406237c87c2a4231ae58",
+      "status": "validated"
+    },
+    {
+      "bytes": 56804275,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2023-12.parquet",
+      "month": "2023-12",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3376567,
+      "source_sha256": "ab4f4db11cb31484747f62eb507c13fcfaff290aaf59c13e6465dea0b1166b9c",
+      "status": "validated"
+    },
+    {
+      "bytes": 49961641,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-01.parquet",
+      "month": "2024-01",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 2964624,
+      "source_sha256": "c4d59da7bbc8abaeeeb1727947ee93d9891a71acb42854bd80db1571b2030510",
+      "status": "validated"
+    },
+    {
+      "bytes": 50349284,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-02.parquet",
+      "month": "2024-02",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3007526,
+      "source_sha256": "c76c43c18c6c6664080dd920baab4928988d5786a6b65980792ca7cd796f9f20",
+      "status": "validated"
+    },
+    {
+      "bytes": 60078280,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-03.parquet",
+      "month": "2024-03",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3582628,
+      "source_sha256": "2d4cdc8fb96726cdd3803b13b02d2e61e71d45720aff0ebc693a8bdd1f249823",
+      "status": "validated"
+    },
+    {
+      "bytes": 59133625,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-04.parquet",
+      "month": "2024-04",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3514289,
+      "source_sha256": "ce37f736c7cf9e92164c850ef2b502a8f7bb590fc1804b6edbcb80293da01b89",
+      "status": "validated"
+    },
+    {
+      "bytes": 62553128,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-05.parquet",
+      "month": "2024-05",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3723833,
+      "source_sha256": "1974230be2b5a3ea92e47b5eb77f32dbf1de896d81ad8df4ab6faba52749ad23",
+      "status": "validated"
+    },
+    {
+      "bytes": 59859922,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-06.parquet",
+      "month": "2024-06",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3539193,
+      "source_sha256": "677cf14c8347f745b583f012fbdba072334c6c4efa17bfd6a64369f2ba30329c",
+      "status": "validated"
+    },
+    {
+      "bytes": 52299432,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-07.parquet",
+      "month": "2024-07",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3076903,
+      "source_sha256": "af12d6b04daeb78550799ae99933d495b27d715b6dbb0fad9bb750a4537d3070",
+      "status": "validated"
+    },
+    {
+      "bytes": 51067350,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-08.parquet",
+      "month": "2024-08",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 2979183,
+      "source_sha256": "7315643dd16bafc03e27d9903edbfd35404c2550a695d0da0a3e73852d940cfb",
+      "status": "validated"
+    },
+    {
+      "bytes": 61170186,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-09.parquet",
+      "month": "2024-09",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3633030,
+      "source_sha256": "2f42e4a383a6635de803001462848d0aee2b47f6ce899126805d2d05361fb843",
+      "status": "validated"
+    },
+    {
+      "bytes": 64346071,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-10.parquet",
+      "month": "2024-10",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3833771,
+      "source_sha256": "d19fe05aa0b259af24eb47051735293287f1e6dc263ba04030ec1ab4c6ec2650",
+      "status": "validated"
+    },
+    {
+      "bytes": 60658709,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-11.parquet",
+      "month": "2024-11",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3646369,
+      "source_sha256": "5ef321876de5007a7c147a347389133fc94fd7ac28f82eb1d57d8f2cf05cfd3b",
+      "status": "validated"
+    },
+    {
+      "bytes": 61524085,
+      "cohort_id": "C2",
+      "file": "yellow_tripdata_2024-12.parquet",
+      "month": "2024-12",
+      "physical_schema_sha256": "960a4eee07af2fe3493486f2281ba8c0795ea4c762a54a29f0bb9122b78e83ab",
+      "rows": 3668371,
+      "source_sha256": "41ebf7db80bebde60c58e5143c14cdf38ad04a0f3e3ff44215b3e240d55f6c78",
+      "status": "validated"
+    },
+    {
+      "bytes": 59158238,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-01.parquet",
+      "month": "2025-01",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 3475226,
+      "source_sha256": "9af277e4c0d3f9deb30644da822981e1e7df6af58313170fd3aa8a474485488a",
+      "status": "validated"
+    },
+    {
+      "bytes": 60343086,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-02.parquet",
+      "month": "2025-02",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 3577543,
+      "source_sha256": "037cba555a73663f3a51a2c27816e40e3feb364769942bdf122b9da31e377bd3",
+      "status": "validated"
+    },
+    {
+      "bytes": 69964745,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-03.parquet",
+      "month": "2025-03",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 4145257,
+      "source_sha256": "20c4b77cce457b7cfdae77c5069ca7dc91c167f876a41467f4502ab69487a186",
+      "status": "validated"
+    },
+    {
+      "bytes": 67352824,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-04.parquet",
+      "month": "2025-04",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 3970553,
+      "source_sha256": "6f98938de9380a3f85600533816f0dc0e6d9b5b210e485d623952bac599bbe28",
+      "status": "validated"
+    },
+    {
+      "bytes": 77837865,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-05.parquet",
+      "month": "2025-05",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 4591845,
+      "source_sha256": "7ef46bcd0fceee7f8c0bb38a532be05bceefabb512d4bb0b32a7727dd862b15c",
+      "status": "validated"
+    },
+    {
+      "bytes": 73542954,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-06.parquet",
+      "month": "2025-06",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 4322960,
+      "source_sha256": "1bea7f5b09c744414451fa7fef09fbc5a393ffb1621c859be6ba0df23a14e1b6",
+      "status": "validated"
+    },
+    {
+      "bytes": 66943728,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-07.parquet",
+      "month": "2025-07",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 3898963,
+      "source_sha256": "1efa6a0458dc60341f7f81dcbb5015af731f42d1a109f4e0d594dd46970fd4ef",
+      "status": "validated"
+    },
+    {
+      "bytes": 62293743,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-08.parquet",
+      "month": "2025-08",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 3574091,
+      "source_sha256": "b982ace703e3564d92e94edae5ec93515f4f1fb07a5b95e7404c32464c1a6a89",
+      "status": "validated"
+    },
+    {
+      "bytes": 72432945,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-09.parquet",
+      "month": "2025-09",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 4251015,
+      "source_sha256": "cd39b9901f01d1fd752d45cbaec91ee5f68c4dddf9e261e938c1dbab404644c7",
+      "status": "validated"
+    },
+    {
+      "bytes": 75267589,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-10.parquet",
+      "month": "2025-10",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 4428699,
+      "source_sha256": "e1f63caf331bc6230d9c6f757cb88e55fdc2bddde185fb414d2c947abdc773c3",
+      "status": "validated"
+    },
+    {
+      "bytes": 71134255,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-11.parquet",
+      "month": "2025-11",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 4181444,
+      "source_sha256": "2cf2f3127f96d4d5dea30f8afe05119cf8e4ba57bd9e60b789d3f296fc8459ab",
+      "status": "validated"
+    },
+    {
+      "bytes": 73701327,
+      "cohort_id": "C3",
+      "file": "yellow_tripdata_2025-12.parquet",
+      "month": "2025-12",
+      "physical_schema_sha256": "ec093ae969b6da7ca6e32ddd89fca991c8ea0ad133226bb371262eb6b3e97c1d",
+      "rows": 4305006,
+      "source_sha256": "eaba7ff61ebb6453fc6f673fda43d621380307f869b768b124992e8486c785e1",
+      "status": "validated"
+    }
+  ],
+  "manifest_sha256": "11db74829a7820870666a5ada355ce3f684366ec038446ebd9647b9996283b71",
+  "manifest_version": "dic-m2a-source-manifest-v1",
+  "source_count": 48,
+  "validation": "passed"
+}
