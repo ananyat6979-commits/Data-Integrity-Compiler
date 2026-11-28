@@ -9,6 +9,7 @@ import shutil
 from dataclasses import asdict
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
+from types import SimpleNamespace
 
 import polars as pl
 import duckdb
@@ -20,6 +21,47 @@ from experiments.m2a import development_ledger, fault_hooks, oracles
 from experiments.m2a.fault_hooks import prepare_case
 from experiments.m2a.oracles import reference_daily_zone_metrics
 from experiments.m2a.verify_v2_run import verify_v2_run
+
+
+DEVELOPMENT_CASES = {
+    "ingestion_duplicate_records": "duplicate-ingestion",
+    "cleaning_fare_threshold": "cleaning-fare-threshold",
+    "join_duplicate_lookup_key": "duplicate-lookup",
+    "aggregation_sum_to_mean": "aggregation-sum-to-mean",
+}
+
+
+def development_plan(catalog: dict) -> list[dict]:
+    design = catalog["case_design"]
+    expected_severities = set(design["severities"])
+    expected_seeds = set(design["seeds"])
+    if (
+        expected_severities != fault_hooks.SUPPORTED_SEVERITIES
+        or expected_seeds != fault_hooks.SUPPORTED_SEEDS
+        or len(design["severities"]) != len(expected_severities)
+        or len(design["seeds"]) != len(expected_seeds)
+    ):
+        raise ValueError("Development plan must use each supported severity and seed exactly once")
+    seen = set()
+    plan = []
+    for mechanism in catalog["mechanisms"]:
+        if mechanism["split"] != "development":
+            continue
+        fault_id = mechanism["fault_id"]
+        if fault_id not in DEVELOPMENT_CASES or fault_id in seen:
+            raise ValueError(f"Unexpected development mechanism: {fault_id}")
+        if (
+            set(mechanism["severity_parameters"]) != expected_severities
+            or set(mechanism["seeds"]) != expected_seeds
+        ):
+            raise ValueError(f"Development matrix differs from the catalog design for {fault_id}")
+        seen.add(fault_id)
+        for severity in design["severities"]:
+            for seed in design["seeds"]:
+                plan.append({"case": DEVELOPMENT_CASES[fault_id], "severity": severity, "seed": seed})
+    if seen != DEVELOPMENT_CASES.keys():
+        raise ValueError("Development catalog does not match the available runners")
+    return plan
 
 
 def _prepare_execution(repository: Path, workspace: Path) -> Path:
@@ -274,19 +316,7 @@ def _identity(args) -> dict:
     }
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repository", type=Path, default=Path.cwd())
-    parser.add_argument("--workspace", type=Path, required=True)
-    parser.add_argument("--source", type=Path, required=True)
-    parser.add_argument("--lookup", type=Path, required=True)
-    parser.add_argument("--ledger", type=Path, help="Append verified results and resume matching development cases")
-    parser.add_argument("--case", choices=("duplicate-lookup", "duplicate-ingestion",
-                                          "cleaning-fare-threshold", "aggregation-sum-to-mean"),
-                        default="duplicate-lookup")
-    parser.add_argument("--severity", choices=("low", "medium", "high"), default="low")
-    parser.add_argument("--seed", type=int, choices=(11, 29, 47), default=11)
-    args = parser.parse_args()
+def _execute_case(args) -> dict:
     def run_case(attempt: Path) -> dict:
         inputs = (args.repository.resolve(), attempt, args.source.resolve(),
                   args.lookup.resolve(), args.severity, args.seed)
@@ -298,19 +328,63 @@ def main() -> None:
 
     workspace = args.workspace.resolve()
     if args.ledger is None:
-        result = run_case(workspace)
+        return run_case(workspace)
+    identity = _identity(args)
+
+    def run_verified(attempt: Path) -> dict:
+        outcome = run_case(attempt)
+        if _identity(args) != identity:
+            raise ValueError("Development case identity changed during execution")
+        return outcome
+
+    return development_ledger.execute_or_resume(workspace, args.ledger.resolve(), identity, run_verified)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--repository", type=Path, default=Path.cwd())
+    parser.add_argument("--workspace", type=Path, required=True)
+    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--lookup", type=Path, required=True)
+    parser.add_argument("--ledger", type=Path, help="Append verified results and resume matching development cases")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--case", choices=tuple(DEVELOPMENT_CASES.values()))
+    mode.add_argument("--matrix", action="store_true", help="Run the catalog's development matrix")
+    parser.add_argument("--severity", choices=("low", "medium", "high"))
+    parser.add_argument("--seed", type=int, choices=(11, 29, 47))
+    parser.add_argument("--offset", type=int, help="Skip this many entries in the matrix plan")
+    parser.add_argument("--limit", type=int, help="Run at most this many entries from the offset")
+    parser.add_argument("--plan-only", action="store_true", help="Print the selected matrix entries")
+    args = parser.parse_args()
+    if args.matrix:
+        if args.severity is not None or args.seed is not None:
+            parser.error("--matrix uses the catalog severities and seeds")
+        if args.source.name != "yellow_tripdata_2024-01.parquet":
+            parser.error("--matrix requires the January 2024 benchmark source")
+        if args.ledger is None and not args.plan_only:
+            parser.error("--matrix execution requires --ledger")
+        catalog = json.loads(fault_hooks.CATALOG_PATH.read_text(encoding="utf-8"))
+        plan = development_plan(catalog)
+        offset = args.offset if args.offset is not None else 0
+        limit = args.limit if args.limit is not None else len(plan)
+        if not 0 <= offset < len(plan) or limit <= 0:
+            parser.error("--offset must identify a matrix entry and --limit must be positive")
+        selected = plan[offset:offset + limit]
+        result = {
+            "planned_cases": len(plan),
+            "offset": offset,
+            "cases": selected if args.plan_only else [
+                {**case, "result": _execute_case(SimpleNamespace(**(vars(args) | case)))}
+                for case in selected
+            ],
+        }
     else:
-        identity = _identity(args)
-
-        def run_verified(attempt: Path) -> dict:
-            outcome = run_case(attempt)
-            if _identity(args) != identity:
-                raise ValueError("Development case identity changed during execution")
-            return outcome
-
-        result = development_ledger.execute_or_resume(
-            workspace, args.ledger.resolve(), identity, run_verified
-        )
+        if args.plan_only or args.offset is not None or args.limit is not None:
+            parser.error("--plan-only, --offset and --limit require --matrix")
+        args.case = args.case or "duplicate-lookup"
+        args.severity = args.severity or "low"
+        args.seed = args.seed if args.seed is not None else 11
+        result = _execute_case(args)
     print(json.dumps(result, indent=2))
 
 
